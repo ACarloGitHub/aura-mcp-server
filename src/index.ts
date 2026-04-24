@@ -14,6 +14,8 @@ import { webSearchTool } from "./tools/webSearch.js";
 import { wikiTool } from "./tools/wiki.js";
 import { plannerTool } from "./tools/planner.js";
 import { compactTool } from "./tools/compact.js";
+import { ragTool } from "./tools/rag.js";
+import { wikiIngestTool } from "./tools/wiki_ingest.js";
 
 // Get workspace from environment or default to current directory
 const WORKSPACE = process.env.AGENT_WORKSPACE || process.cwd();
@@ -89,6 +91,39 @@ const TOOLS: Tool[] = [
     },
   },
   {
+    name: "wiki_ingest",
+    description: "Advanced wiki management following the Karpathy LLM Wiki pattern. Actions: ingest (load raw source for processing), query (search wiki), lint (health check), update_index (regenerate index), update_log (append log entry).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["ingest", "query", "lint", "update_index", "update_log"], description: "Action to perform" },
+        source: { type: "string", description: "Source file path (for ingest/update_log)" },
+        query_text: { type: "string", description: "Search query text (for query)" },
+      },
+      required: ["action"],
+    },
+  },
+  {
+    name: "rag",
+    description: "Semantic search via ChromaDB + nomic embeddings. Actions: search (semantic query), add (add document), add_batch (bulk add), list (list collection), delete (remove doc), collections (list all collections), ingest_sessions (index LM Studio sessions).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["search", "add", "add_batch", "list", "delete", "collections", "ingest_sessions"], description: "Action to perform" },
+        collection: { type: "string", description: "Collection name (required for search/add/list/delete)" },
+        query: { type: "string", description: "Search query (for search)" },
+        id: { type: "string", description: "Document ID (for add/delete)" },
+        text: { type: "string", description: "Document text (for add), or JSON array (for add_batch)" },
+        metadata: { type: "string", description: "JSON metadata (for add)" },
+        limit: { type: "number", description: "Max results (for search/list, default 5/50)" },
+        filter: { type: "string", description: "JSON where filter (for search)" },
+        folder: { type: "string", description: "LM Studio sessions folder (for ingest_sessions)" },
+        reindex: { type: "boolean", description: "Re-index from scratch (for ingest_sessions)" },
+      },
+      required: ["action"],
+    },
+  },
+  {
     name: "planner",
     description: "Create and manage phased plans. Actions: create, read, list, update, delete, next.",
     inputSchema: {
@@ -104,11 +139,14 @@ const TOOLS: Tool[] = [
   },
   {
     name: "compact",
-    description: "Compact the current session. Preserves key data and starts fresh. Actions: status, compact.",
+    description: "Manage memory and session compaction. MEMORY: auto-compacts MEMORY.md when >300 lines. SESSION: compacts an LM Studio session into a summary saved to compacted-sessions/. STATUS: shows memory/session state. LIST: lists compacted sessions.",
     inputSchema: {
       type: "object",
       properties: {
-        action: { type: "string", enum: ["status", "compact"], description: "Action" },
+        action: { type: "string", enum: ["memory", "session", "status", "list"], description: "Action: memory=compact MEMORY.md, session=compact LM Studio session, status=show state, list=list compacted sessions" },
+        session: { type: "string", description: "Session in 'FolderName/file.conversation.json' format (for action=session)" },
+        model: { type: "string", description: "Model to use for summarization (for action=session, default: loaded model)" },
+        threshold: { type: "number", description: "Line threshold for memory compaction (default: 300, for action=memory)" },
       },
       required: ["action"],
     },
@@ -139,10 +177,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return await webSearchTool(args as any);
       case "wiki":
         return await wikiTool(args as any, WORKSPACE);
+      case "wiki_ingest":
+        return await wikiIngestTool(args as any);
+      case "rag":
+        return await ragTool(args as any);
       case "planner":
         return await plannerTool(args as any, WORKSPACE);
       case "compact":
-        return await compactTool(args as any, WORKSPACE);
+        return await compactTool(args as any);
       default:
         throw new Error(`Unknown tool: ${name}`);
     }

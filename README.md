@@ -1,28 +1,28 @@
-# LM Studio Agent Server
+# 🧠 LM Studio Agent Server
 
-An [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server for [LM Studio](https://lmstudio.ai) that gives your local LLM agent a persistent personality, memory, wiki, planner, and session compaction.
+An [MCP](https://modelcontextprotocol.io) server for [LM Studio](https://lmstudio.ai) that gives your local LLM persistent memory, semantic search, a structured wiki, planner, and session compaction — all local, all private.
 
 ## Features
 
-| Feature | Description |
-|---------|-------------|
-| **Personality** | `SOUL.md` defines the agent's core identity. The agent asks the user for a name on first boot. |
-| **Memory** | `MEMORY.md` for session notes with automatic compaction when it grows too large. |
-| **User Profile** | `USER.md` for user preferences and facts, filled in over time. |
-| **Wiki** | Full [LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) system for persistent structured knowledge. |
-| **Planner** | Phased project plans with user questions and step-by-step execution. |
-| **Session Compaction** | Compact long sessions, preserve key data, start fresh. |
-| **Cross-Platform** | Works on Windows, Linux, and macOS. |
-| **Built-in Tools** | `exec`, `read`, `write`, `web_search`, `wiki`, `planner`, `compact`. |
+| | |
+|---|---|
+| 🧬 **Personality** | `SOUL.md` defines who the agent is. First boot asks for name and role. |
+| 📝 **Memory** | `MEMORY.md` for session notes. Auto-compacts when >300 lines. |
+| 👤 **User Profile** | `USER.md` for preferences, filled in over time. |
+| 📚 **Wiki** | Full [Karpathy-style wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) with summaries, concepts, entities, syntheses. |
+| 📋 **Planner** | Phased project plans with checklists and blocking questions. |
+| 📦 **Session Compaction** | Compact long conversations into summaries. Start fresh without losing context. |
+| 🔎 **RAG** | Semantic search via ChromaDB over sessions and auto-extracted entities. |
+| 🛠️ **9 Built-in Tools** | `exec`, `read`, `write`, `web_search`, `wiki`, `wiki_ingest`, `rag`, `planner`, `compact`. |
 
 ## Requirements
 
-- **Node.js** 18 or later
-- **LM Studio** 0.3 or later (with MCP support)
+- **Node.js** 18+
+- **LM Studio** 0.3+ (with MCP support)
+- **Python 3** with `chromadb` (for RAG, optional)
+- An embedding model in LM Studio (e.g. `nomic-embed-text-v1.5`) for RAG
 
 ## Quick Start
-
-### 1. Install
 
 ```bash
 git clone https://github.com/yourusername/lm-studio-agent-server.git
@@ -30,12 +30,7 @@ cd lm-studio-agent-server
 npm install
 ```
 
-### 2. Configure LM Studio
-
-Add to LM Studio's MCP config file:
-
-**Linux/macOS:** `~/.lmstudio/mcp.json`
-**Windows:** `%USERPROFILE%\.lmstudio\mcp.json`
+Then add to LM Studio's MCP config (`~/.lmstudio/mcp.json`):
 
 ```json
 {
@@ -51,55 +46,94 @@ Add to LM Studio's MCP config file:
 }
 ```
 
-**Windows example:**
-```json
-{
-  "mcpServers": {
-    "agent-server": {
-      "command": "C:\\Program Files\\nodejs\\node.exe",
-      "args": ["C:\\Users\\YourName\\lm-studio-agent-server\\dist\\index.js"],
-      "env": {
-        "AGENT_WORKSPACE": "C:\\Users\\YourName\\lm-studio-agent-server"
-      }
-    }
-  }
-}
+Restart LM Studio. The server connects automatically.
+
+## Tools
+
+| Tool | What it does |
+|------|-------------|
+| `exec` | Run shell commands (timeout, workdir, env, background) |
+| `read` | Read text files or images (jpg, png, gif, webp) |
+| `write` | Write files, auto-creates parent directories |
+| `web_search` | Search via DuckDuckGo (free) or Brave API |
+| `wiki` | Search, read, write, list wiki pages |
+| `wiki_ingest` | Advanced wiki management (ingest, lint, update) |
+| `rag` | Semantic search (ChromaDB + nomic embeddings) |
+| `planner` | Create and execute phased plans |
+| `compact` | Memory compaction + session compaction |
+
+### compact
+
+Two modes:
+
+- **`compact action=memory`** — Auto-archives `MEMORY.md` when it exceeds 300 lines. Old content goes to `memory-archive.md`, MEMORY.md keeps the header + fresh Notes section. Run without asking — routine maintenance.
+
+- **`compact action=session session="Folder/file.conversation.json"`** — Compacts a long LM Studio session. The tool reads the `.conversation.json`, summarizes via the model, and saves to `compacted-sessions/` as a markdown file. **Not indexed in RAG** — just a file the model reads when recovering context in a new session.
+
+Use `compact action=status` to check memory state, `compact action=list` to see compacted sessions.
+
+### planner
+
+```
+planner action=create name=MyPlan content="..."
+planner action=read name=MyPlan
+planner action=list
+planner action=next name=MyPlan
+planner action=next name=MyPlan answer="my response"
 ```
 
-### 3. First Boot
+Plans support checklists (`- [ ] task`), phases (`### Phase 1`), and blocking questions (`- [ ] Question for user: ...`).
 
-When LM Studio loads the agent, the model reads `SOUL.md` and asks:
-1. "What name would you like to give me?"
-2. "What language do you prefer?"
-3. "What would you like to do?"
+### rag
 
-The agent writes the chosen name into `SOUL.md` and `MEMORY.md`.
+```
+rag action=search collection=sessions query="neural networks"
+rag action=search collection=entities query="Python"
+rag action=collections
+```
+
+Sessions are indexed in RAG when added via `rag add` or `ingest_sessions`. Entities are automatically extracted from sessions in a background thread — no extra steps needed. If auto-extraction failed, run `rag action=extract_entities collection=sessions` manually.
+
+### wiki_ingest
+
+```
+wiki_ingest action=lint
+wiki_ingest action=update_index
+wiki_ingest action=ingest source="raw/document.md"
+```
+
+Follows the [Karpathy wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): raw sources → agent creates summaries, concepts, entities → cross-linked in index.md.
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AGENT_WORKSPACE` | `.` | Working directory. All file ops scoped here. |
+| `BRAVE_API_KEY` | — | Optional Brave Search API key |
+| `LM_STUDIO_URL` | `http://localhost:1234` | LM Studio server URL |
+| `LM_STUDIO_CONVERSATIONS_DIR` | `~/.lmstudio/conversations` | LM Studio sessions directory |
+| `CHROMA_DATA_DIR` | `{WORKSPACE}/rag/chroma_data` | ChromaDB persistence |
+| `SESSION_EXPORT_DIR` | `{WORKSPACE}/session-exports` | Session export output |
+| `EMBEDDING_MODEL` | `nomic-ai/nomic-embed-text-v1.5-GGUF` | Embedding model for RAG |
 
 ## Project Structure
 
 ```
 lm-studio-agent-server/
-├── SOUL.md              # Agent personality & first-boot protocol
-├── USER.md              # User profile (filled in over time)
-├── MEMORY.md            # Working memory (compact when >300 lines)
-├── COMPACT.md           # Session compaction protocol
-├── PLANNER.md           # Planner protocol
-├── BORN.md              # First boot instructions for the LLM
-├── TOOLS.md             # Available tools reference
-├── piano-llm-wiki.md    # Wiki architecture documentation
-├── src/                 # TypeScript source
-│   ├── index.ts         # MCP server entry point
-│   ├── tools/           # Tool implementations
-│   │   ├── exec.ts      # Shell commands
-│   │   ├── read.ts      # File reading
-│   │   ├── write.ts     # File writing
-│   │   ├── webSearch.ts # Web search (DuckDuckGo/Brave)
-│   │   ├── wiki.ts      # Wiki management
-│   │   ├── planner.ts   # Plan creation and execution
-│   │   └── compact.ts   # Session compaction
-│   └── utils/           # Utilities
-├── wiki-template/       # Empty wiki structure for new agents
-├── docs/                # Documentation
+├── SOUL.md              # Agent personality
+├── USER.md              # User profile
+├── MEMORY.md            # Working memory
+├── HELP.md              # Quick command reference
+├── src/tools/           # 11 tool implementations
+│   ├── compact.ts       # Memory + session compaction
+│   ├── planner.ts       # Phased plans
+│   ├── rag.ts           # RAG frontend
+│   ├── wiki_ingest.ts   # Advanced wiki management
+│   ├── rag.py           # ChromaDB backend
+│   ├── session_export.py
+│   └── ...
+├── wiki-template/       # Empty wiki scaffolding
+├── docs/                # Detailed docs
 │   ├── setup.md
 │   ├── first-boot.md
 │   ├── architecture.md
@@ -109,120 +143,12 @@ lm-studio-agent-server/
 │   └── env-vars.md
 ├── package.json
 ├── tsconfig.json
-└── LICENSE
+└── LICENSE (MIT)
 ```
 
-## MCP Tools
+## Screenshots
 
-| Tool | Description |
-|------|-------------|
-| `exec` | Execute shell commands with timeout, working directory, and background support. |
-| `read` | Read text files or images (jpg, png, gif, webp). Supports offset and limit. |
-| `write` | Write files, creating parent directories automatically. |
-| `web_search` | Search the web via DuckDuckGo (free) or Brave API (optional key). |
-| `wiki` | Manage the local LLM wiki: search, read, write, list. |
-| `planner` | Create and manage phased plans: create, read, list, update, delete, next. |
-| `compact` | Check status or compact the session memory. |
-
-## Environment Variables
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `AGENT_WORKSPACE` | No | `.` | Agent working directory. All file operations are scoped here. |
-| `BRAVE_API_KEY` | No | — | Brave Search API key. Enables Brave search engine. |
-
-## Wiki System
-
-The LLM Wiki follows the [Karpathy pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) for persistent structured knowledge.
-
-```
-wiki/
-├── index.md           # Catalog of all pages
-├── log.md             # Append-only chronological log
-├── summaries/         # One page per source
-├── concepts/          # Concepts and frameworks
-├── entities/          # People, tools, organizations
-├── syntheses/         # Cross-cutting analysis
-└── presentations/     # Marp slides (optional)
-```
-
-### Operations
-
-- **Ingest** — Process raw sources into summaries, concepts, and entities.
-- **Query** — Search the wiki and synthesize answers with citations.
-- **Lint** — Health check for orphans, contradictions, broken links.
-
-## Planner
-
-Create structured, phased plans that the agent executes step by step.
-
-```markdown
----
-title: "Setup Dev Environment"
-created: 2026-04-21
-status: active
----
-
-# Plan: Setup Dev Environment
-
-## Objective
-Install Node.js, Git, and VS Code.
-
-## Phases
-
-### Phase 1: Node.js
-- [x] Check current version
-- [ ] Install Node 20 LTS
-- [ ] Verify installation
-
-### Phase 2: Git
-- [ ] Install Git
-- [ ] Configure user.name and user.email
-- [ ] Question for user: Which Git hosting service do you use?
-  - Option A: GitHub
-  - Option B: GitLab
-```
-
-**Commands:**
-- `planner create` — Start a new plan.
-- `planner read` — Display current plan.
-- `planner list` — List all plans.
-- `planner next` — Execute next step or answer blocking question.
-
-## Session Compaction
-
-When `MEMORY.md` exceeds ~300 lines, compact the session:
-
-1. Review session and identify key decisions, insights, facts.
-2. Summarize into a compact paragraph (max 200 words).
-3. Preserve critical details in wiki or `MEMORY.md`.
-4. Archive to `memory-archive.md`.
-5. Start a new session with the summary as initial context.
-
-**Commands:**
-- `compact status` — Check if compaction is needed.
-- `compact compact` — Execute compaction now.
-
-## Security
-
-- All file paths are resolved relative to `AGENT_WORKSPACE`.
-- Paths outside the workspace are rejected.
-- Shell commands run with the user's permissions.
-- The agent never modifies files outside its workspace without explicit user permission.
-
-## Customization
-
-Edit `SOUL.md` before first boot to customize the agent's personality. The agent will adapt to the user's preferences over time.
-
-## Documentation
-
-- [Setup Guide](docs/setup.md)
-- [First Boot](docs/first-boot.md)
-- [Architecture](docs/architecture.md)
-- [Wiki System](docs/wiki.md)
-- [Planner](docs/planner.md)
-- [Session Compaction](docs/compaction.md)
-- [Environment Variables](docs/env-vars.md)
+*(Coming soon)*
 
 ## License
 
@@ -230,5 +156,5 @@ MIT
 
 ## Acknowledgments
 
-- Inspired by Andrej Karpathy's [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
-- Built with the [Model Context Protocol](https://modelcontextprotocol.io)
+- [Andrej Karpathy's LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
+- [Model Context Protocol](https://modelcontextprotocol.io)

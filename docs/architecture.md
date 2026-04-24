@@ -19,7 +19,7 @@ LM Studio Agent Server
     ├── PLANNER.md      — Planner protocol
     ├── BORN.md         — First boot protocol
     ├── TOOLS.md        — Tool reference
-    ├── piano-llm-wiki.md — Wiki architecture
+    ├── llm-wiki-plan.md — Wiki architecture
     └── wiki/           — Knowledge base
 ```
 
