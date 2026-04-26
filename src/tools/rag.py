@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-RAG Engine — Python backend for ChromaDB + embeddings via LM Studio.
+RAG Engine — ChromaDB + local GGUF embeddings via llama-cpp-python.
 Called by the MCP server's TypeScript tools.
 
 Usage:
@@ -20,43 +20,93 @@ import re
 import threading
 import requests
 
+from llama_cpp import Llama
+
+# ============================================================================
 # Configuration from environment
+# ============================================================================
 WORKSPACE = os.environ.get("AGENT_WORKSPACE", os.getcwd())
 CHROMA_DIR = os.environ.get("CHROMA_DATA_DIR", os.path.join(WORKSPACE, "rag", "chroma_data"))
-LM_STUDIO_URL = os.environ.get("LM_STUDIO_URL", "http://localhost:1234")
-EMBEDDINGS_URL = f"{LM_STUDIO_URL}/v1/embeddings"
-LM_STUDIO_CHAT_URL = f"{LM_STUDIO_URL}/v1/chat/completions"
-EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "nomic-ai/nomic-embed-text-v1.5-GGUF")
+
+# Local GGUF embedding model (no external server needed)
+EMBEDDING_MODEL_PATH = os.environ.get(
+    "EMBEDDING_MODEL_PATH",
+    os.path.join(WORKSPACE, "models", "nomic-embed-text-v1.5.Q8_0.gguf")
+)
+EMBEDDING_N_GPU = int(os.environ.get("EMBEDDING_N_GPU", "0"))
+
+# Entity extraction is optional — requires Ollama running.
+# Falls back silently if unavailable.
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
+CHAT_URL = f"{OLLAMA_URL}/api/chat"
+CHAT_MODEL = os.environ.get("CHAT_MODEL", "deepseek-v4-flash:cloud")
+
+# ============================================================================
+# Embedding engine (local GGUF via llama-cpp-python)
+# ============================================================================
+
+_llm: Llama | None = None
 
 
-def get_embeddings(texts: list[str]) -> list[list[float]]:
-    """Get embeddings from LM Studio's embedding model."""
-    try:
-        resp = requests.post(EMBEDDINGS_URL, json={
-            "model": EMBEDDING_MODEL,
-            "input": texts
-        }, timeout=30)
-        resp.raise_for_status()
-        data = resp.json()
-        sorted_data = sorted(data["data"], key=lambda x: x["index"])
-        return [item["embedding"] for item in sorted_data]
-    except Exception as e:
-        print(json.dumps({"error": f"Embedding failed: {e}"}), file=sys.stderr)
+def _get_model() -> Llama:
+    """Lazy-init the GGUF model. Exits with a clear error if not found."""
+    global _llm
+    if _llm is not None:
+        return _llm
+
+    if not os.path.isfile(EMBEDDING_MODEL_PATH):
+        print(json.dumps({
+            "error": f"Embedding model not found at: {EMBEDDING_MODEL_PATH}\n"
+                     f"Download it from:\n"
+                     f"  wget -O models/nomic-embed-text-v1.5.Q8_0.gguf "
+                     f"https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF/resolve/main/nomic-embed-text-v1.5.Q8_0.gguf"
+        }), file=sys.stderr)
         sys.exit(1)
 
+    _llm = Llama(
+        model_path=EMBEDDING_MODEL_PATH,
+        embedding=True,
+        n_gpu_layers=EMBEDDING_N_GPU,
+        n_ctx=2048,
+        verbose=False,
+    )
+    return _llm
 
-def get_chroma_client():
-    """Get or create ChromaDB persistent client."""
+
+def get_embeddings(texts: list[str], is_query: bool = False) -> list[list[float]]:
+    """Generate embeddings using the local GGUF model.
+    
+    Uses nomic-embed-text-v1.5 prefixes for better retrieval quality:
+    - "search_document: " for document indexing
+    - "search_query: " for search queries
+    """
+    llm = _get_model()
+    prefix = "search_query: " if is_query else "search_document: "
+    prefixed = [f"{prefix}{t}" for t in texts]
+
+    result = llm.create_embedding(input=prefixed)
+    return [item["embedding"] for item in result["data"]]
+
+
+# ============================================================================
+# ChromaDB client
+# ============================================================================
+
+def _get_chroma_client():
     import chromadb
     os.makedirs(CHROMA_DIR, exist_ok=True)
     return chromadb.PersistentClient(path=CHROMA_DIR)
 
 
+# ============================================================================
+# Entity extraction (optional — requires Ollama)
+# ============================================================================
+
 def extract_entities_from_text(text: str) -> list[dict]:
     """
-    Call the LM Studio model to extract entities from text.
+    Call an LLM (via Ollama) to extract entities from text.
     Returns [{name, type, description}].
-    Fire-and-forget: returns empty list on failure.
+    Fire-and-forget: returns empty list on failure (Ollama not running, etc.).
     """
     max_chars = 8000
     input_text = text[:max_chars]
@@ -77,16 +127,16 @@ TEXT:
 JSON:"""
 
     try:
-        resp = requests.post(LM_STUDIO_CHAT_URL, json={
-            "model": "",
+        resp = requests.post(CHAT_URL, json={
+            "model": CHAT_MODEL,
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 2000,
-            "temperature": 0.1,
+            "options": {"temperature": 0.1, "num_predict": 2000},
+            "stream": False,
         }, timeout=120)
 
         resp.raise_for_status()
         data = resp.json()
-        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        content = data.get("message", {}).get("content", "")
 
         if not content.strip():
             return []
@@ -104,16 +154,14 @@ JSON:"""
 
 
 def auto_extract_entities(doc_id: str, text: str):
-    """
-    Extract entities from text and add them to the 'entities' collection.
-    Runs in a separate thread (fire-and-forget).
-    """
+    """Extract entities from text and add them to the 'entities' collection.
+    Runs in a background thread (fire-and-forget)."""
     try:
         entities = extract_entities_from_text(text)
         if not entities:
             return
 
-        client = get_chroma_client()
+        client = _get_chroma_client()
         collection = client.get_or_create_collection(
             name="entities",
             metadata={"hnsw:space": "cosine"}
@@ -158,9 +206,13 @@ def auto_extract_entities(doc_id: str, text: str):
         pass  # Never block the main operation
 
 
+# ============================================================================
+# CLI commands
+# ============================================================================
+
 def cmd_add(args):
     """Add a document to a collection. Auto-extracts entities if collection=sessions."""
-    client = get_chroma_client()
+    client = _get_chroma_client()
     collection = client.get_or_create_collection(
         name=args.collection,
         metadata={"hnsw:space": "cosine"}
@@ -199,7 +251,7 @@ def cmd_add(args):
 
 def cmd_add_batch(args):
     """Add multiple documents at once. Auto-extracts entities if collection=sessions."""
-    client = get_chroma_client()
+    client = _get_chroma_client()
     collection = client.get_or_create_collection(
         name=args.collection,
         metadata={"hnsw:space": "cosine"}
@@ -246,16 +298,13 @@ def cmd_add_batch(args):
 
 
 def cmd_extract_entities(args):
-    """
-    Manual command: extract entities from existing RAG documents.
-    Useful as a fallback if auto-extraction failed.
-    """
+    """Manual command: extract entities from existing RAG documents."""
     if not args.id and not args.text:
         if not args.collection:
             print(json.dumps({"error": "Specify --id or --collection"}))
             sys.exit(1)
 
-        client = get_chroma_client()
+        client = _get_chroma_client()
         try:
             collection = client.get_collection(name=args.collection)
         except Exception:
@@ -290,7 +339,7 @@ def cmd_extract_entities(args):
 
 def cmd_search(args):
     """Search for similar documents."""
-    client = get_chroma_client()
+    client = _get_chroma_client()
 
     try:
         collection = client.get_collection(name=args.collection)
@@ -298,7 +347,7 @@ def cmd_search(args):
         print(json.dumps({"error": f"Collection '{args.collection}' not found"}))
         sys.exit(1)
 
-    query_embedding = get_embeddings([args.query])[0]
+    query_embedding = get_embeddings([args.query], is_query=True)[0]
 
     where_filter = None
     if args.filter:
@@ -330,7 +379,7 @@ def cmd_search(args):
 
 def cmd_list(args):
     """List documents in a collection."""
-    client = get_chroma_client()
+    client = _get_chroma_client()
 
     try:
         collection = client.get_collection(name=args.collection)
@@ -362,7 +411,7 @@ def cmd_list(args):
 
 def cmd_delete(args):
     """Delete a document from a collection."""
-    client = get_chroma_client()
+    client = _get_chroma_client()
 
     try:
         collection = client.get_collection(name=args.collection)
@@ -377,22 +426,26 @@ def cmd_delete(args):
 
 def cmd_collections(args):
     """List all collections."""
-    client = get_chroma_client()
+    client = _get_chroma_client()
     collections = client.list_collections()
 
     result = []
     for col in collections:
         try:
             count = col.count()
-        except:
+        except Exception:
             count = "unknown"
         result.append({"name": col.name, "count": count})
 
     print(json.dumps({"collections": result}, indent=2))
 
 
+# ============================================================================
+# Main
+# ============================================================================
+
 def main():
-    parser = argparse.ArgumentParser(description="RAG Engine - ChromaDB + LM Studio Embeddings")
+    parser = argparse.ArgumentParser(description="RAG Engine - ChromaDB + Local GGUF Embeddings")
     subparsers = parser.add_subparsers(dest="command", help="Command")
 
     add_parser = subparsers.add_parser("add", help="Add a document")

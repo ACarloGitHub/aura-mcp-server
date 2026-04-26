@@ -7,3 +7,14 @@ wiki/raw/*/
 rag/chroma_data/
 session-exports/
 compacted-sessions/
+
+# GGUF model files (download via instructions in README)
+models/*.gguf
+!models/.gitkeep
+
+# Python virtual environment
+venv/
+
+# Python cache
+__pycache__/
+*.pyc

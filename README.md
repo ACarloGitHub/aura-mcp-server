@@ -36,8 +36,34 @@ An [MCP](https://modelcontextprotocol.io) server for [LM Studio](https://lmstudi
 
 - **Node.js** 18+
 - **LM Studio** 0.3+ (with MCP support)
-- **Python 3** with `chromadb` (for RAG, optional)
-- An embedding model in LM Studio (e.g. `nomic-embed-text-v1.5`) for RAG
+- **Python 3** with `chromadb` and `llama-cpp-python` (for RAG)
+
+### RAG Setup
+
+For semantic search (RAG), install the Python dependencies:
+
+```bash
+pip install chromadb llama-cpp-python
+```
+
+Then download an embedding model:
+
+```bash
+# Create models directory
+mkdir -p models
+
+# Download nomic-embed-text-v1.5 Q8_0 (140MB, CPU-friendly)
+wget -O models/nomic-embed-text-v1.5.Q8_0.gguf \
+  https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF/resolve/main/nomic-embed-text-v1.5.Q8_0.gguf
+```
+
+The RAG engine loads the model directly — no external server required.  
+See [Environment Variables](#environment-variables) for the `EMBEDDING_MODEL_PATH` option.
+
+### Entity Extraction (Optional)
+
+Entity extraction requires **Ollama** running on `http://localhost:11434` with a chat model (e.g., `deepseek-v4-flash:cloud`).  
+If Ollama is not available, entity extraction is silently skipped — RAG search still works fine.
 
 ## Quick Start
 
@@ -131,7 +157,7 @@ Follows the [Karpathy wiki pattern](https://gist.github.com/karpathy/442a6bf5559
 | `LM_STUDIO_CONVERSATIONS_DIR` | `~/.lmstudio/conversations` | LM Studio sessions directory |
 | `CHROMA_DATA_DIR` | `{WORKSPACE}/rag/chroma_data` | ChromaDB persistence |
 | `SESSION_EXPORT_DIR` | `{WORKSPACE}/session-exports` | Session export output |
-| `EMBEDDING_MODEL` | `nomic-ai/nomic-embed-text-v1.5-GGUF` | Embedding model for RAG |
+| `EMBEDDING_MODEL_PATH` | `{WORKSPACE}/models/nomic-embed-text-v1.5.Q8_0.gguf` | Path to the GGUF embedding model |
 
 ## Project Structure
 
