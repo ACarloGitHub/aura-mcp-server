@@ -1,0 +1,44 @@
+import { readFile, writeFile } from "fs/promises";
+import { resolveWorkspacePath, formatError, textResult } from "../utils/helpers.js";
+
+interface EditArgs {
+  path?: string;
+  file_path?: string;
+  search?: string;
+  match?: string;
+  oldText?: string;
+  old_string?: string;
+  replace?: string;
+  content?: string;
+  newText?: string;
+  new_string?: string;
+}
+
+/**
+ * Alias per filesystem-edit-text-file.
+ * Supporta tutte le varianti di parametri che AnythingLLM potrebbe usare.
+ */
+export async function editTool(args: EditArgs): Promise<any> {
+  const filePath = resolveWorkspacePath(args.path || args.file_path || "");
+  if (!filePath) return formatError("Parametro richiesto: path o file_path");
+
+  const oldStr = args.old_string || args.oldText || args.search || args.match || "";
+  const newStr = args.new_string || args.newText || args.replace || args.content || "";
+
+  if (!oldStr) return formatError("Parametro richiesto: old_string / search / match / oldText");
+
+  try {
+    const fileContent = await readFile(filePath, "utf-8");
+    if (!fileContent.includes(oldStr)) {
+      return formatError(`Stringa non trovata nel file: ${filePath}`);
+    }
+    const updated = fileContent.replace(oldStr, newStr);
+    if (updated === fileContent) {
+      return formatError("Nessuna modifica effettuata");
+    }
+    await writeFile(filePath, updated, "utf-8");
+    return textResult(`File modificato: ${filePath}`);
+  } catch (error) {
+    return formatError(`Errore modifica: ${(error as Error).message}`);
+  }
+}

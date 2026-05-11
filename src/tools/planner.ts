@@ -1,168 +1,273 @@
-import { readFile, writeFile, mkdir, readdir, unlink } from "fs/promises";
+import { readFile, writeFile, mkdir, readdir, unlink, stat } from "fs/promises";
 import { join, resolve, basename } from "path";
+import { getWorkspaceRoot, textResult, formatError } from "../utils/helpers.js";
 
 interface PlannerArgs {
-  action: "create" | "read" | "list" | "update" | "delete" | "next";
+  action: "create" | "read" | "list" | "update" | "delete" | "next" | "status";
   name?: string;
   content?: string;
   answer?: string;
 }
 
-function getPlansDir(workspace: string): string {
-  return join(workspace, "plans");
+function getPlansDir(): string {
+  return resolve(getWorkspaceRoot(), "plans");
 }
 
-export async function plannerTool(args: PlannerArgs, workspace: string): Promise<any> {
+export async function plannerTool(args: PlannerArgs): Promise<any> {
   const { action, name, content, answer } = args;
 
-  switch (action) {
-    case "create":
-      if (!name || !content) throw new Error("Parameters 'name' and 'content' required for create");
-      return await createPlan(name, content, workspace);
-    case "read":
-      if (!name) throw new Error("Parameter 'name' required for read");
-      return await readPlan(name, workspace);
-    case "list":
-      return await listPlans(workspace);
-    case "update":
-      if (!name || !content) throw new Error("Parameters 'name' and 'content' required for update");
-      return await updatePlan(name, content, workspace);
-    case "delete":
-      if (!name) throw new Error("Parameter 'name' required for delete");
-      return await deletePlan(name, workspace);
-    case "next":
-      if (!name) throw new Error("Parameter 'name' required for next");
-      return await nextStep(name, answer, workspace);
-    default:
-      throw new Error(`Unknown planner action: ${action}`);
+  try {
+    switch (action) {
+      case "create":
+        if (!name || !content) throw new Error("Parametri 'name' e 'content' richiesti per create");
+        return await createPlan(name, content);
+      case "read":
+        if (!name) throw new Error("Parametro 'name' richiesto per read");
+        return await readPlan(name);
+      case "list":
+        return await listPlans();
+      case "update":
+        if (!name || !content) throw new Error("Parametri 'name' e 'content' richiesti per update");
+        return await updatePlan(name, content);
+      case "delete":
+        if (!name) throw new Error("Parametro 'name' richiesto per delete");
+        return await deletePlan(name);
+      case "next":
+        if (!name) throw new Error("Parametro 'name' richiesto per next");
+        return await nextStep(name, answer);
+      case "status":
+        if (!name) throw new Error("Parametro 'name' richiesto per status");
+        return await planStatus(name);
+      default:
+        throw new Error(`Azione planner sconosciuta: ${action}`);
+    }
+  } catch (err) {
+    return formatError(err);
   }
 }
 
-async function createPlan(name: string, content: string, workspace: string): Promise<any> {
-  const plansDir = getPlansDir(workspace);
+async function createPlan(name: string, content: string): Promise<any> {
+  const plansDir = getPlansDir();
   const filePath = resolve(plansDir, `${name}.md`);
 
   if (!filePath.startsWith(resolve(plansDir))) {
-    throw new Error("Invalid plan name");
+    return formatError(new Error("Nome piano non valido: tentativo di path traversal"));
   }
 
   await mkdir(plansDir, { recursive: true });
   await writeFile(filePath, content, "utf-8");
 
-  return { content: [{ type: "text", text: `Plan created: ${name}.md` }] };
+  return textResult(`Piano creato: ${name}.md`);
 }
 
-async function readPlan(name: string, workspace: string): Promise<any> {
-  const plansDir = getPlansDir(workspace);
+async function readPlan(name: string): Promise<any> {
+  const plansDir = getPlansDir();
   const filePath = resolve(plansDir, `${name}.md`);
 
   if (!filePath.startsWith(resolve(plansDir))) {
-    throw new Error("Invalid plan name");
+    return formatError(new Error("Nome piano non valido"));
   }
 
   try {
     const content = await readFile(filePath, "utf-8");
-    return { content: [{ type: "text", text: content }] };
-  } catch (error) {
-    return { content: [{ type: "text", text: `Plan not found: ${name}` }], isError: true };
+    return textResult(content);
+  } catch {
+    return { content: [{ type: "text", text: `Piano non trovato: ${name}` }], isError: true };
   }
 }
 
-async function listPlans(workspace: string): Promise<any> {
-  const plansDir = getPlansDir(workspace);
+async function listPlans(): Promise<any> {
+  const plansDir = getPlansDir();
   try {
     const entries = await readdir(plansDir, { withFileTypes: true });
-    const plans = entries
-      .filter(e => e.isFile() && e.name.endsWith(".md"))
-      .map(e => basename(e.name, ".md"));
+    const plans = entries.filter((e) => e.isFile() && e.name.endsWith(".md")).map((e) => basename(e.name, ".md"));
 
-    if (plans.length === 0) {
-      return { content: [{ type: "text", text: "No plans found." }] };
-    }
+    if (plans.length === 0) return textResult("Nessun piano trovato.");
 
-    return { content: [{ type: "text", text: `Plans:\n\n${plans.map((p, i) => `${i + 1}. ${p}`).join("\n")}` }] };
-  } catch (error) {
-    return { content: [{ type: "text", text: "No plans found." }] };
+    return textResult(`Piani:\n\n${plans.map((p, i) => `${i + 1}. ${p}`).join("\n")}`);
+  } catch {
+    return textResult("Nessun piano trovato.");
   }
 }
 
-async function updatePlan(name: string, content: string, workspace: string): Promise<any> {
-  const plansDir = getPlansDir(workspace);
+async function updatePlan(name: string, content: string): Promise<any> {
+  const plansDir = getPlansDir();
   const filePath = resolve(plansDir, `${name}.md`);
 
   if (!filePath.startsWith(resolve(plansDir))) {
-    throw new Error("Invalid plan name");
+    return formatError(new Error("Nome piano non valido"));
   }
 
   await writeFile(filePath, content, "utf-8");
-  return { content: [{ type: "text", text: `Plan updated: ${name}.md` }] };
+  return textResult(`Piano aggiornato: ${name}.md`);
 }
 
-async function deletePlan(name: string, workspace: string): Promise<any> {
-  const plansDir = getPlansDir(workspace);
+async function deletePlan(name: string): Promise<any> {
+  const plansDir = getPlansDir();
   const filePath = resolve(plansDir, `${name}.md`);
 
   if (!filePath.startsWith(resolve(plansDir))) {
-    throw new Error("Invalid plan name");
+    return formatError(new Error("Nome piano non valido"));
   }
 
   try {
     await unlink(filePath);
-    return { content: [{ type: "text", text: `Plan deleted: ${name}.md` }] };
-  } catch (error) {
-    return { content: [{ type: "text", text: `Plan not found: ${name}` }], isError: true };
+    return textResult(`Piano eliminato: ${name}.md`);
+  } catch {
+    return { content: [{ type: "text", text: `Piano non trovato: ${name}` }], isError: true };
   }
 }
 
-async function nextStep(name: string, answer: string | undefined, workspace: string): Promise<any> {
-  const plansDir = getPlansDir(workspace);
+async function nextStep(name: string, answer: string | undefined): Promise<any> {
+  const plansDir = getPlansDir();
   const filePath = resolve(plansDir, `${name}.md`);
 
   if (!filePath.startsWith(resolve(plansDir))) {
-    throw new Error("Invalid plan name");
+    return formatError(new Error("Nome piano non valido"));
   }
 
+  let content: string;
   try {
-    const content = await readFile(filePath, "utf-8");
+    content = await readFile(filePath, "utf-8");
+  } catch {
+    return { content: [{ type: "text", text: `Piano non trovato: ${name}` }], isError: true };
+  }
 
-    // Find the first unchecked task
-    const uncheckedRegex = /^- \[ \] (.*)$/gm;
-    const match = uncheckedRegex.exec(content);
+  // Cerca il primo task non completato (riga per riga)
+  const lines = content.split("\n");
+  let firstUncheckedIndex = -1;
+  let firstUncheckedLine = "";
 
-    if (!match) {
-      // Check if there are blocking questions
-      const questionRegex = /- \[ \] Question for user: (.*)\n(\s*- Option [A-Z]: .*\n)*/;
-      const qMatch = content.match(questionRegex);
+  for (let i = 0; i < lines.length; i++) {
+    if (/^- \[ \] (?!Question)/.test(lines[i])) {
+      firstUncheckedIndex = i;
+      firstUncheckedLine = lines[i];
+      break;
+    }
+  }
 
-      if (qMatch && answer) {
-        // Record answer and mark question as done
-        const updated = content.replace(qMatch[0], `- [x] Question answered: ${qMatch[1]}\n  - Answer: ${answer}`);
-        await writeFile(filePath, updated, "utf-8");
-        return { content: [{ type: "text", text: `Recorded answer for "${qMatch[1]}"\n\nNext: ${findNextTask(updated)}` }] };
+  if (firstUncheckedIndex < 0) {
+    // Nessun task aperto: cerca domande bloccanti (riga per riga)
+    let questionStartIndex = -1;
+    let questionText = "";
+    let optionEndIndex = -1;
+
+    for (let i = 0; i < lines.length; i++) {
+      if (/^- \[ \] Question(?:\s+for\s+user)?:/i.test(lines[i])) {
+        questionStartIndex = i;
+        questionText = lines[i].replace(/^- \[ \] Question(?:\s+for\s+user)?:\s*/i, "");
+        // Cerca option lines che seguono
+        let j = i + 1;
+        while (j < lines.length && /^\s*- Option [A-Z]:/.test(lines[j])) {
+          j++;
+        }
+        optionEndIndex = j;
+        break;
       }
-
-      if (qMatch && !answer) {
-        return { content: [{ type: "text", text: `Blocking question: "${qMatch[1]}"\n\nPlease answer with planner action "next" and provide the "answer" parameter.` }] };
-      }
-
-      // All done
-      const updated = content.replace(/status: active/, "status: completed");
-      await writeFile(filePath, updated, "utf-8");
-      return { content: [{ type: "text", text: "Plan completed!" }] };
     }
 
-    // Mark the task as done
-    const updated = content.replace(match[0], `- [x] ${match[1]}`);
-    await writeFile(filePath, updated, "utf-8");
+    if (questionStartIndex >= 0 && answer) {
+      const blockLines = lines.slice(questionStartIndex, optionEndIndex);
+      const block = blockLines.join("\n");
+      const replacement = `- [x] Domanda risposta: ${questionText}\n  - Risposta: ${answer}`;
+      const updated = content.replace(block, replacement);
 
-    return { content: [{ type: "text", text: `Completed: ${match[1]}\n\nNext: ${findNextTask(updated)}` }] };
-  } catch (error) {
-    return { content: [{ type: "text", text: `Plan not found: ${name}` }], isError: true };
+      try {
+        await writeFile(filePath, updated, "utf-8");
+      } catch (e) {
+        return formatError(new Error(`Errore scrittura piano durante registrazione risposta: ${e instanceof Error ? e.message : String(e)}`));
+      }
+
+      return textResult(`Risposta registrata per "${questionText}"\n\nProssimo: ${findNextTask(updated)}`);
+    }
+
+    if (questionStartIndex >= 0 && !answer) {
+      return textResult(`Domanda bloccante: "${questionText}"\n\nRispondi con planner action=next e il parametro answer.`);
+    }
+
+    // Nessuna domanda: piano completato
+    const finalContent = content.replace(/status: active/, "status: completato");
+    try {
+      await writeFile(filePath, finalContent, "utf-8");
+    } catch (e) {
+      return formatError(new Error(`Errore scrittura piano in stato completato: ${e instanceof Error ? e.message : String(e)}`));
+    }
+    return textResult("Piano completato!");
   }
+
+  // Marca il primo task come completato
+  const taskText = firstUncheckedLine.replace(/^- \[ \] /, "");
+  const updated = content.replace(firstUncheckedLine, `- [x] ${taskText}`);
+
+  try {
+    await writeFile(filePath, updated, "utf-8");
+  } catch (e) {
+    return formatError(new Error(`Errore scrittura piano durante completamento task: ${e instanceof Error ? e.message : String(e)}`));
+  }
+
+  return textResult(`Completato: ${taskText}\n\nProssimo: ${findNextTask(updated)}`);
 }
 
 function findNextTask(content: string): string {
-  const uncheckedRegex = /^- \[ \] (.*)$/gm;
-  const match = uncheckedRegex.exec(content);
-  return match ? match[1] : "No more tasks. Plan complete!";
+  const lines = content.split("\n");
+  for (const line of lines) {
+    if (/^- \[ \] (?!Question)/.test(line)) {
+      return line.replace(/^- \[ \] /, "");
+    }
+  }
+  // Check for question
+  for (const line of lines) {
+    if (/^- \[ \] Question(?:\s+for\s+user)?:/i.test(line)) {
+      return `[DOMANDA] ${line.replace(/^- \[ \] Question(?:\s+for\s+user)?:\s*/i, "")}`;
+    }
+  }
+  return "Nessun altro task. Piano completato!";
+}
+
+async function planStatus(name: string): Promise<any> {
+  const plansDir = getPlansDir();
+  const filePath = resolve(plansDir, `${name}.md`);
+
+  if (!filePath.startsWith(resolve(plansDir))) {
+    return formatError(new Error("Nome piano non valido"));
+  }
+
+  let content: string;
+  try {
+    content = await readFile(filePath, "utf-8");
+  } catch {
+    return { content: [{ type: "text", text: `Piano non trovato: ${name}` }], isError: true };
+  }
+
+  const lines = content.split("\n");
+  let total = 0;
+  let completed = 0;
+  let blockingQuestion: string | null = null;
+
+  for (const line of lines) {
+    if (/^- \[[ x]\] /.test(line)) {
+      total++;
+      if (/^- \[x\] /.test(line)) {
+        completed++;
+      }
+    }
+    if (!blockingQuestion && /^- \[ \] Question(?:\s+for\s+user)?:/i.test(line)) {
+      blockingQuestion = line.replace(/^- \[ \] Question(?:\s+for\s+user)?:\s*/i, "");
+    }
+  }
+
+  const remaining = total - completed;
+  const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+  let statusText = `Piano: ${name}\n`;
+  statusText += `Task totali: ${total}\n`;
+  statusText += `Completati: ${completed}\n`;
+  statusText += `Rimanenti: ${remaining}\n`;
+  statusText += `Avanzamento: ${percentage}%\n`;
+
+  if (blockingQuestion) {
+    statusText += `\nDomanda bloccante attiva: "${blockingQuestion}"`;
+  }
+
+  return textResult(statusText);
 }
