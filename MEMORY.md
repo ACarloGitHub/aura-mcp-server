@@ -29,4 +29,3 @@ Keep this file concise. When it exceeds ~300 lines, compact or migrate to the wi
 ## Migration Rule
 
 When this file exceeds 300 lines, run the compaction protocol (see COMPACT.md) or migrate stable concepts to the wiki.
-Session 2026-04-21 17:54 — Reviewed SOUL.md, USER.md, MEMORY.md. Created SOUL.bak. TODO written to desktop. Next: review src/ and docs/.

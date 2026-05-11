@@ -18,3 +18,5 @@ venv/
 # Python cache
 __pycache__/
 *.pyc
+# Syncthing conflict files
+*.sync-conflict*
