@@ -25,6 +25,10 @@ __pycache__/
 api-key.json
 lm-studio-config.json
 
+# Backup files
+SOUL.bak
+*.bak
+
 # Backup folder
 backup/
 

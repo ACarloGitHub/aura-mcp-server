@@ -31,9 +31,13 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4"
   },
+  "optionalDependencies": {
+    "node-notifier": "^10.0.1"
+  },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/node-notifier": "^8.0.5",
+    "cross-env": "^7.0.3",
     "typescript": "^5.9.3"
   }
 }

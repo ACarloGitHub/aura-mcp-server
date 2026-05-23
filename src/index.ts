@@ -28,42 +28,42 @@ import { notifyTool } from "./tools/notify.js";
 const ALIASES: Tool[] = [
   {
     name: "filesystem-read-text-file",
-    description: "Alias read. Legge file. Params: path, offset, limit.",
+    description: "Alias for read. Reads a file. Params: path, offset, limit.",
     inputSchema: {
       type: "object",
       properties: {
-        path: { type: "string", description: "Percorso file" },
-        offset: { type: "number", description: "Linea inizio (opzionale)" },
-        limit: { type: "number", description: "Max linee (opzionale)" },
+        path: { type: "string", description: "File path" },
+        offset: { type: "number", description: "Start line (optional)" },
+        limit: { type: "number", description: "Max lines (optional)" },
       },
       required: ["path"],
     },
   },
   {
     name: "filesystem-write-text-file",
-    description: "Alias write. Scrive file. Params: path, content.",
+    description: "Alias for write. Writes a file. Params: path, content.",
     inputSchema: {
       type: "object",
       properties: {
-        path: { type: "string", description: "Percorso file" },
-        content: { type: "string", description: "Contenuto" },
+        path: { type: "string", description: "File path" },
+        content: { type: "string", description: "Content" },
       },
       required: ["path", "content"],
     },
   },
   {
     name: "filesystem-edit-text-file",
-    description: "Modifica file. Params: path, search/old_string, replace/new_string.",
+    description: "Edit a file. Params: path, search/old_string, replace/new_string.",
     inputSchema: {
       type: "object",
       properties: {
-        path: { type: "string", description: "Percorso file" },
-        file_path: { type: "string", description: "Alternativa a path" },
-        search: { type: "string", description: "Testo da trovare" },
+        path: { type: "string", description: "File path" },
+        file_path: { type: "string", description: "Alternative to path" },
+        search: { type: "string", description: "Text to find" },
         old_string: { type: "string", description: "Alias search" },
         match: { type: "string", description: "Alias search" },
         oldText: { type: "string", description: "Alias search" },
-        replace: { type: "string", description: "Testo sostitutivo" },
+        replace: { type: "string", description: "Replacement text" },
         new_string: { type: "string", description: "Alias replace" },
         content: { type: "string", description: "Alias replace" },
         newText: { type: "string", description: "Alias replace" },
@@ -73,11 +73,11 @@ const ALIASES: Tool[] = [
   },
   {
     name: "filesystem-list-directory",
-    description: "Elenca directory. Params: path/directory/folder/dir.",
+    description: "List directory contents. Params: path/directory/folder/dir.",
     inputSchema: {
       type: "object",
       properties: {
-        path: { type: "string", description: "Percorso directory" },
+        path: { type: "string", description: "Directory path" },
         directory: { type: "string", description: "Alias path" },
         folder: { type: "string", description: "Alias path" },
         dir: { type: "string", description: "Alias path" },
@@ -93,17 +93,17 @@ const ALIASES: Tool[] = [
 const TOOLS: Tool[] = [
   {
     name: "edit",
-    description: "Modifica file esistente. Params: path, search/old_string, replace/new_string.",
+    description: "Edit an existing file. Params: path, search/old_string, replace/new_string.",
     inputSchema: {
       type: "object",
       properties: {
-        path: { type: "string", description: "Percorso file" },
-        file_path: { type: "string", description: "Alternativa a path" },
-        search: { type: "string", description: "Testo da trovare" },
+        path: { type: "string", description: "File path" },
+        file_path: { type: "string", description: "Alternative to path" },
+        search: { type: "string", description: "Text to find" },
         old_string: { type: "string", description: "Alias search" },
         match: { type: "string", description: "Alias search" },
         oldText: { type: "string", description: "Alias search" },
-        replace: { type: "string", description: "Testo sostitutivo" },
+        replace: { type: "string", description: "Replacement text" },
         new_string: { type: "string", description: "Alias replace" },
         content: { type: "string", description: "Alias replace" },
         newText: { type: "string", description: "Alias replace" },
@@ -113,11 +113,11 @@ const TOOLS: Tool[] = [
   },
   {
     name: "list_dir",
-    description: "Elenca directory. Params: path/directory/folder/dir.",
+    description: "List directory contents. Params: path/directory/folder/dir.",
     inputSchema: {
       type: "object",
       properties: {
-        path: { type: "string", description: "Percorso directory" },
+        path: { type: "string", description: "Directory path" },
         directory: { type: "string", description: "Alias path" },
         folder: { type: "string", description: "Alias path" },
         dir: { type: "string", description: "Alias path" },
@@ -127,45 +127,45 @@ const TOOLS: Tool[] = [
   },
   {
     name: "exec",
-    description: "Shell exec. Params: command, timeout(360s), workdir, env, background. Output max 200KB.",
+    description: "Run a shell command. Params: command, timeout(360s), workdir, env, background. Output max 200KB.",
     inputSchema: {
       type: "object",
       properties: {
-        command: { type: "string", description: "Comando da eseguire" },
-        workdir: { type: "string", description: "Directory di lavoro (opzionale)" },
-        timeout: { type: "number", description: "Timeout in secondi (default 360, max 7200)" },
-        background: { type: "boolean", description: "Esegui in background (opzionale). Restituisce subito il sessionId." },
-        env: { type: "object", description: "Variabili d'ambiente aggiuntive (opzionale)" },
+        command: { type: "string", description: "Command to run" },
+        workdir: { type: "string", description: "Working directory (optional)" },
+        timeout: { type: "number", description: "Timeout in seconds (default 360, max 7200)" },
+        background: { type: "boolean", description: "Run in background (optional). Returns sessionId immediately." },
+        env: { type: "object", description: "Additional environment variables (optional)" },
       },
       required: ["command"],
     },
   },
   {
     name: "exec_poll",
-    description: "Legge output di un exec in background. Params: jobId (sessionId), tail (default 100).",
+    description: "Poll output of a background exec job. Params: jobId (sessionId), tail (default 100).",
     inputSchema: {
       type: "object",
       properties: {
-        jobId: { type: "string", description: "Il sessionId restituito da exec con background:true" },
-        tail: { type: "number", description: "Ultime N righe da restituire (default 100)" },
+        jobId: { type: "string", description: "The sessionId returned by exec with background:true" },
+        tail: { type: "number", description: "Last N lines to return (default 100)" },
       },
       required: ["jobId"],
     },
   },
   {
     name: "exec_kill",
-    description: "Termina un exec in background. Params: jobId (sessionId).",
+    description: "Kill a background exec job. Params: jobId (sessionId).",
     inputSchema: {
       type: "object",
       properties: {
-        jobId: { type: "string", description: "Il sessionId del job da terminare" },
+        jobId: { type: "string", description: "The sessionId of the job to terminate" },
       },
       required: ["jobId"],
     },
   },
   {
     name: "exec_list",
-    description: "Elenca tutti i job background (running e completati) con stato e età.",
+    description: "List all background jobs (running and completed) with status and age.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -174,151 +174,151 @@ const TOOLS: Tool[] = [
   },
   {
     name: "exec_clean",
-    description: "Pulisce i file dei job background completati. Params: maxAgeHours (default 24), all (boolean, elimina tutto).",
+    description: "Clean up completed background job files. Params: maxAgeHours (default 24), all (boolean, remove all).",
     inputSchema: {
       type: "object",
       properties: {
-        maxAgeHours: { type: "number", description: "Elimina job completati più vecchi di N ore (default 24)" },
-        all: { type: "boolean", description: "Se true, elimina tutti i job completati indipendentemente dall'età" },
+        maxAgeHours: { type: "number", description: "Delete completed jobs older than N hours (default 24)" },
+        all: { type: "boolean", description: "If true, delete all completed jobs regardless of age" },
       },
       required: [],
     },
   },
   {
     name: "read",
-    description: "Legge file. Params: path, offset, limit. Immagini OK. File >10MB rifiutati.",
+    description: "Read a file. Params: path, offset, limit. Images supported. Files >10MB rejected.",
     inputSchema: {
       type: "object",
       properties: {
-        path: { type: "string", description: "Percorso del file da leggere" },
-        offset: { type: "number", description: "Linea di inizio per file di testo (1-based, opzionale)" },
-        limit: { type: "number", description: "Numero massimo di linee per file di testo (opzionale)" },
+        path: { type: "string", description: "Path of the file to read" },
+        offset: { type: "number", description: "Start line for text files (1-based, optional)" },
+        limit: { type: "number", description: "Maximum number of lines for text files (optional)" },
       },
       required: ["path"],
     },
   },
   {
     name: "write",
-    description: "Scrive file. Params: path, content. Crea dirs automaticamente. Max 5MB.",
+    description: "Write a file. Params: path, content. Creates directories automatically. Max 5MB.",
     inputSchema: {
       type: "object",
       properties: {
-        path: { type: "string", description: "Percorso del file da scrivere" },
-        content: { type: "string", description: "Contenuto da scrivere" },
+        path: { type: "string", description: "Path of the file to write" },
+        content: { type: "string", description: "Content da scrivere" },
       },
       required: ["path", "content"],
     },
   },
   {
     name: "web_search",
-    description: "Ricerca web. Params: query, count(5), engine(duckduckgo/brave). Timeout 30s.",
+    description: "Web search. Params: query, count(5), engine(duckduckgo/brave). Timeout 30s.",
     inputSchema: {
       type: "object",
       properties: {
-        query: { type: "string", description: "Query di ricerca" },
-        count: { type: "number", description: "Numero di risultati (1-10, default 5)" },
-        engine: { type: "string", enum: ["duckduckgo", "brave"], description: "Motore di ricerca" },
+        query: { type: "string", description: "Search query" },
+        count: { type: "number", description: "Number of results (1-10, default 5)" },
+        engine: { type: "string", enum: ["duckduckgo", "brave"], description: "Search engine" },
       },
       required: ["query"],
     },
   },
   {
     name: "wiki",
-    description: "Wiki locale. Azioni: search, read, write, list. Params: action, query/path/content, maxResults.",
+    description: "Local wiki. Actions: search, read, write, list. Params: action, query/path/content, maxResults.",
     inputSchema: {
       type: "object",
       properties: {
-        action: { type: "string", enum: ["search", "read", "write", "list"], description: "Azione da eseguire" },
-        query: { type: "string", description: "Query di ricerca (per action=search)" },
-        path: { type: "string", description: "Percorso pagina, es: 'progetti/idea.md' (per action=read/write)" },
-        content: { type: "string", description: "Contenuto markdown (per action=write)" },
-        maxResults: { type: "number", description: "Numero max risultati (opzionale, default 10)" },
+        action: { type: "string", enum: ["search", "read", "write", "list"], description: "Action to perform" },
+        query: { type: "string", description: "Search query (per action=search)" },
+        path: { type: "string", description: "Page path, e.g. 'projects/idea.md' (for action=read/write)" },
+        content: { type: "string", description: "Content markdown (per action=write)" },
+        maxResults: { type: "number", description: "Max number of results (optional, default 10)" },
       },
       required: ["action"],
     },
   },
   {
     name: "rag",
-    description: "Ricerca semantica ChromaDB. Azioni: search, add, list, delete, collections, ingest_sessions.",
+    description: "Semantic search via ChromaDB + Ollama embeddings. Actions: search, add, list, delete, collections, ingest_sessions.",
     inputSchema: {
       type: "object",
       properties: {
-        action: { type: "string", enum: ["search", "add", "list", "delete", "collections", "ingest_sessions"], description: "Azione RAG" },
-        collection: { type: "string", description: "Nome collection (per action=search/add/list/delete)" },
-        query: { type: "string", description: "Query di ricerca semantica (per action=search)" },
-        id: { type: "string", description: "ID documento (per action=add/delete)" },
-        text: { type: "string", description: "Testo documento (per action=add)" },
-        metadata: { type: "string", description: "Metadati JSON string (per action=add)" },
-        limit: { type: "number", description: "Numero max risultati (default 5 per search, 50 per list)" },
-        filter: { type: "string", description: "Filtro JSON per metadata (per action=search)" },
-        folder: { type: "string", description: "Cartella sessioni specifica (per action=ingest_sessions)" },
-        reindex: { type: "boolean", description: "Re-indicizza tutto da capo (per action=ingest_sessions)" },
+        action: { type: "string", enum: ["search", "add", "list", "delete", "collections", "ingest_sessions"], description: "RAG action" },
+        collection: { type: "string", description: "Collection name (for action=search/add/list/delete)" },
+        query: { type: "string", description: "Search query semantica (per action=search)" },
+        id: { type: "string", description: "Document ID (for action=add/delete)" },
+        text: { type: "string", description: "Document text (for action=add)" },
+        metadata: { type: "string", description: "JSON metadata string (for action=add)" },
+        limit: { type: "number", description: "Max results (default 5 for search, 50 for list)" },
+        filter: { type: "string", description: "JSON metadata filter (for action=search)" },
+        folder: { type: "string", description: "Specific session folder (for action=ingest_sessions)" },
+        reindex: { type: "boolean", description: "Re-index everything from scratch (for action=ingest_sessions)" },
       },
       required: ["action"],
     },
   },
   {
     name: "wiki_ingest",
-    description: "Wiki avanzata Karpathy. Azioni: ingest, query, lint, update_index, update_log.",
+    description: "Advanced Karpathy-style wiki. Actions: ingest, query, lint, update_index, update_log.",
     inputSchema: {
       type: "object",
       properties: {
         action: { type: "string", enum: ["ingest", "query", "lint", "update_index", "update_log"], description: "Azione" },
-        source: { type: "string", description: "Percorso file raw (per ingest) o descrizione operazione (per update_log)" },
-        query_text: { type: "string", description: "Testo query (per action=query)" },
+        source: { type: "string", description: "File path raw (per ingest) o descrizione operazione (per update_log)" },
+        query_text: { type: "string", description: "Query text (for action=query)" },
       },
       required: ["action"],
     },
   },
   {
     name: "planner",
-    description: "Piani in fasi. Azioni: create, read, list, update, delete, next, status. Salvati in plans/.",
+    description: "Phased project planner. Actions: create, read, list, update, delete, next, status. Saved in plans/.",
     inputSchema: {
       type: "object",
       properties: {
         action: { type: "string", enum: ["create", "read", "list", "update", "delete", "next", "status"], description: "Azione" },
-        name: { type: "string", description: "Nome del piano" },
-        content: { type: "string", description: "Contenuto markdown del piano (per create/update)" },
-        answer: { type: "string", description: "Risposta a domanda bloccante (per action=next)" },
+        name: { type: "string", description: "Plan name" },
+        content: { type: "string", description: "Content markdown del piano (per create/update)" },
+        answer: { type: "string", description: "Answer to a blocking question (for action=next)" },
       },
       required: ["action"],
     },
   },
   {
     name: "compact",
-    description: "Compatta memoria. Azioni: memory(auto), status, list. Soglia default 300 righe.",
+    description: "Compact memory. Actions: memory(auto), status, list. Default threshold: 300 lines.",
     inputSchema: {
       type: "object",
       properties: {
         action: { type: "string", enum: ["memory", "status", "list"], description: "Azione" },
-        threshold: { type: "number", description: "Soglia righe per memory compaction (default: 300)" },
+        threshold: { type: "number", description: "Line threshold for memory compaction (default: 300)" },
       },
       required: ["action"],
     },
   },
   {
     name: "anythingllm",
-    description: "Esporta chat AnythingLLM. Azioni: list, export, export-all. API localhost:3001.",
+    description: "Export AnythingLLM chat sessions. Actions: list, export, export-all. API at localhost:3001.",
     inputSchema: {
       type: "object",
       properties: {
         action: { type: "string", enum: ["list", "export", "export-all"], description: "Azione" },
-        workspace: { type: "string", description: "Slug del workspace (per export)" },
-        thread: { type: "string", description: "Slug del thread (opzionale, per export)" },
-        apiKey: { type: "string", description: "API key AnythingLLM (opzionale, usa env ANYTHINGLLM_API_KEY o quella di default)" },
+        workspace: { type: "string", description: "Workspace slug (for export)" },
+        thread: { type: "string", description: "Thread slug (optional, for export)" },
+        apiKey: { type: "string", description: "AnythingLLM API key (optional, uses ANYTHINGLLM_API_KEY env var or api-key.json)" },
       },
       required: ["action"],
     },
   },
   {
     name: "notify",
-    description: "Notifica desktop + beep sonoro. Params: message, title, sound(boolean, default true).",
+    description: "Desktop notification + beep. Params: message, title, sound(boolean, default true).",
     inputSchema: {
       type: "object",
       properties: {
-        message: { type: "string", description: "Messaggio della notifica" },
-        title: { type: "string", description: "Titolo della notifica (opzionale)" },
-        sound: { type: "boolean", description: "Emetti beep sonoro (default true)" },
+        message: { type: "string", description: "Notification message" },
+        title: { type: "string", description: "Notification title (optional)" },
+        sound: { type: "boolean", description: "Emit a beep sound (default true)" },
       },
       required: ["message"],
     },
@@ -385,7 +385,7 @@ function autoNotify(name: string, rawResult: any): void {
     try {
       if (!isAnythingLLMForeground()) {
 
-        let body = `Tool "${name}" completato`;
+        let body = `Tool "${name}" completed`;
         if (rawResult?.content && Array.isArray(rawResult.content) && rawResult.content.length > 0) {
           const firstText = rawResult.content[0]?.text;
           if (typeof firstText === "string" && firstText.length < 80 && firstText.trim().length > 0) {
@@ -503,7 +503,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         result = await listDirTool(args as any);
         break;
       default:
-        throw new Error(`Tool sconosciuto: ${name}`);
+        throw new Error(`Unknown tool: ${name}`);
     }
 
     const elapsed = Date.now() - start;
@@ -519,7 +519,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const msg = error instanceof Error ? error.message : String(error);
     console.error(`[MCP ERROR] ${name} FAILED after ${elapsed}ms: ${msg}`);
     return {
-      content: [{ type: "text", text: `Errore: ${msg}` }],
+      content: [{ type: "text", text: `Error: ${msg}` }],
       isError: true,
     };
   }
@@ -538,42 +538,10 @@ async function main() {
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("LM Studio MCP Server v2.0 avviato su stdio");
+  console.error("Aura MCP Server v2.0 started on stdio");
 }
 
 main().catch((error) => {
-  console.error("Errore fatale avvio server:", error);
-  process.exit(1);
-});
-turn result;
-  } catch (error) {
-    const elapsed = Date.now() - start;
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error(`[MCP ERROR] ${name} FAILED after ${elapsed}ms: ${msg}`);
-    return {
-      content: [{ type: "text", text: `Errore: ${msg}` }],
-      isError: true,
-    };
-  }
-});
-
-// ============================================================
-// MAIN
-// ============================================================
-async function main() {
-  process.on("uncaughtException", (err) => {
-    console.error("[FATAL uncaughtException]", err);
-  });
-  process.on("unhandledRejection", (reason) => {
-    console.error("[FATAL unhandledRejection]", reason);
-  });
-
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("LM Studio MCP Server v2.0 avviato su stdio");
-}
-
-main().catch((error) => {
-  console.error("Errore fatale avvio server:", error);
+  console.error("Fatal startup error:", error);
   process.exit(1);
 });

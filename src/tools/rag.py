@@ -25,9 +25,9 @@ import chromadb
 from chromadb.config import Settings
 
 # ─── Config ──────────────────────────────────────────────────────────────────
-_script_dir = Path(__file__).resolve().parent       # mcp-server/src/tools/
-_server_dir = _script_dir.parent.parent               # mcp-server/
-_project_root = _server_dir.parent                    # AuraMCP/
+_script_dir = Path(__file__).resolve().parent       # aura-mcp-server/src/tools/
+_server_dir = _script_dir.parent.parent               # aura-mcp-server/
+_project_root = _server_dir.parent                    # parent workspace dir
 
 BASE_DIR = _server_dir
 CHROMA_DIR = str(BASE_DIR / "rag" / "chroma_data")
@@ -72,29 +72,25 @@ def get_chroma_client():
 
 
 # ─── Entity extraction (senza LLM, usa pattern) ──────────────────────
+# KNOWN_ENTITIES: customize with the names, projects and places relevant to you.
+# These are used to extract and enrich metadata when indexing sessions.
+# Add entries in your own language as needed.
 KNOWN_ENTITIES = {
     "persons": [
-        "Carlo", "Iya", "Agata", "Giulia Torchiani", "Valentina Cherchi",
-        "Maria", "Letizia", "Federica", "Elena", "Sofia", "Marco",
-        "Aura", "Adam", "Eva",
+        # Add names of people you interact with, e.g.: "Alice", "Bob"
     ],
     "projects": [
-        "AuraWrite", "3LO", "Audiobook Generator", "Hermes", "OpenClaw",
-        "LM Studio Agent Server", "Personale RAG", "llm-wiki", "Onyx Tab Ultra",
-        "Trello Locale", "AnythingLLM",
-        "ChromaDB", "Ollama", "OpenCode", "LM Studio",
-        "DeepSeek", "Qwen", "Minimax", "GLM", "Kimi", "Gemma",
-        "Nomic Embed", "nomic-embed-text",
+        # Tech tools always useful to recognize
+        "AnythingLLM", "LM Studio", "ChromaDB", "Ollama",
+        "RAG", "MCP", "nomic-embed-text",
+        # Add your own projects, e.g.: "MyProject", "WorkApp"
     ],
     "places": [
-        "Cagliari", "Sardegna", "Italia", "Russia", "Mosca",
-        "Verona", "Sabbioncello",
+        # Add places relevant to you, e.g.: "London", "Berlin"
     ],
     "concepts": [
-        "separazione", "timidezza", "vibe coding", "local-first",
-        "zero cloud", "privacy", "RAG", "embedding", "LLM",
-        "MCP", "intelligenza artificiale", "memoria persistente",
-        "vettoriale", "semantica", "entities", "ingest",
+        "local-first", "zero cloud", "privacy", "RAG", "embedding", "LLM",
+        "MCP", "persistent memory", "vector", "semantic", "entities", "ingest",
     ],
 }
 

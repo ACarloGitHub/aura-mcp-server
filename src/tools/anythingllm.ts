@@ -1,10 +1,15 @@
 import { writeFile, mkdir, readdir, readFile } from "fs/promises";
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { getWorkspaceRoot, textResult, formatError } from "../utils/helpers.js";
 
 const WORKSPACE = getWorkspaceRoot();
 const SESSIONI_DIR = join(WORKSPACE, "SessioniAnythingllm");
-const API_BASE = "http://localhost:3001/api/v1";
+const API_BASE = process.env.ANYTHINGLLM_BASE_URL || "http://localhost:3001/api/v1";
+
+// Resolve the server root directory (where api-key.json should be placed)
+// @ts-ignore — import.meta.url valido in ESM Node16
+const _serverDir = dirname(dirname(fileURLToPath(import.meta.url)));
 
 async function getApiKey(argsKey?: string): Promise<string> {
   // 1. Parametro diretto nel tool
@@ -13,22 +18,27 @@ async function getApiKey(argsKey?: string): Promise<string> {
   // 2. Env var
   if (process.env.ANYTHINGLLM_API_KEY) return process.env.ANYTHINGLLM_API_KEY;
 
-  // 3. File api-key.json nella cartella del server
-  try {
-    const serverDir = join(WORKSPACE, "mcp-server");
-    const configPath = join(serverDir, "api-key.json");
-    const raw = await readFile(configPath, "utf-8");
-    const parsed = JSON.parse(raw);
-    if (parsed.anythingllm_api_key && parsed.anythingllm_api_key !== "INSERISCI-QUI-LA-TUA-API-KEY") {
-      return parsed.anythingllm_api_key;
+  // 3. File api-key.json nella cartella del server (e.g. aura-mcp-server/api-key.json)
+  //    Cerca prima nella dir del server, poi nel workspace
+  const candidates = [
+    join(_serverDir, "api-key.json"),
+    join(WORKSPACE, "api-key.json"),
+  ];
+  for (const configPath of candidates) {
+    try {
+      const raw = await readFile(configPath, "utf-8");
+      const parsed = JSON.parse(raw);
+      if (parsed.anythingllm_api_key && parsed.anythingllm_api_key !== "INSERISCI-QUI-LA-TUA-API-KEY") {
+        return parsed.anythingllm_api_key;
+      }
+    } catch {
+      // ignore, try next candidate
     }
-  } catch {
-    // ignore
   }
 
   throw new Error(
     "API key AnythingLLM non trovata. " +
-    "Inseriscila in mcp-server/api-key.json oppure passa env ANYTHINGLLM_API_KEY."
+    "Inseriscila in api-key.json (cartella del server) oppure imposta la variabile d'ambiente ANYTHINGLLM_API_KEY."
   );
 }
 
@@ -144,12 +154,12 @@ async function exportChats(apiKey: string, workspaceSlug?: string, threadSlug?: 
   md += `---\n\n`;
   md += `# AnythingLLM — ${workspaceSlug}\n`;
   if (threadSlug) md += `\nThread: ${threadSlug}\n`;
-  md += `\nEsportato il ${new Date().toLocaleDateString("it-IT")}\n`;
+  md += `\nEsportato il ${new Date().toLocaleDateString("en-US")}\n`;
   md += `Messaggi: ${messages.length}\n\n`;
   md += `---\n\n`;
 
   for (const msg of messages) {
-    const dateStr = msg.sentAt ? new Date(msg.sentAt * 1000).toLocaleString("it-IT") : "data sconosciuta";
+    const dateStr = msg.sentAt ? new Date(msg.sentAt * 1000).toLocaleString("en-US") : "data sconosciuta";
     const role = msg.role === "user" ? "Utente" : "Assistente";
     md += `### ${role} — ${dateStr}\n\n`;
     md += `${msg.content}\n\n`;
@@ -265,22 +275,22 @@ function buildFrontmatter(workspaceSlug: string, msgCount: number, threadSlug?: 
 
 function buildChatBody(messages: ChatMessage[]): string {
   let md = "";
-  md += `Esportato il ${new Date().toLocaleDateString("it-IT")}\n`;
-  md += `Messaggi: ${messages.length}\n\n---\n\n`;
+  md += `Exported on ${new Date().toLocaleDateString()}\n`;
+  md += `Messages: ${messages.length}\n\n---\n\n`;
 
   for (const msg of messages) {
-    const dateStr = msg.sentAt ? new Date(msg.sentAt * 1000).toLocaleString("it-IT") : "data sconosciuta";
-    const role = msg.role === "user" ? "Utente" : "Assistente";
+    const dateStr = msg.sentAt ? new Date(msg.sentAt * 1000).toLocaleString() : "unknown date";
+    const role = msg.role === "user" ? "User" : "Assistant";
     md += `### ${role} — ${dateStr}\n\n`;
     md += `${msg.content}\n\n`;
 
     if (msg.metrics?.model) {
-      md += `> Modello: ${msg.metrics.model}`;
+      md += `> Model: ${msg.metrics.model}`;
       if (msg.metrics.provider) md += ` | Provider: ${msg.metrics.provider}`;
       md += "\n\n";
     }
   }
 
-  md += `---\n\n_Esportato via AnythingLLM API_\n`;
+  md += `---\n\n_Exported via AnythingLLM API_\n`;
   return md;
 }

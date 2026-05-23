@@ -20,12 +20,14 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-_script_dir = Path(__file__).resolve().parent  # mcp-server/src/tools/
-_server_dir = _script_dir.parent.parent           # mcp-server/
-_project_root = _server_dir.parent                # AuraMCP/
+_script_dir = Path(__file__).resolve().parent  # aura-mcp-server/src/tools/
+_server_dir = _script_dir.parent.parent           # aura-mcp-server/
+_project_root = _server_dir.parent                # parent workspace dir
 
 WORKSPACE = os.environ.get("AGENT_WORKSPACE", str(_project_root))
-CONVERSATIONS_DIR = os.path.join(os.path.expanduser("~"), ".lmstudio", "conversations")
+# LM_STUDIO_CONVERSATIONS_DIR can be overridden via env var
+_default_conversations = os.path.join(os.path.expanduser("~"), ".lmstudio", "conversations")
+CONVERSATIONS_DIR = os.environ.get("LM_STUDIO_CONVERSATIONS_DIR", _default_conversations)
 EXPORT_DIR = os.path.join(WORKSPACE, "Sessioni")
 RAG_SCRIPT = os.path.join(_script_dir, "rag.py")
 

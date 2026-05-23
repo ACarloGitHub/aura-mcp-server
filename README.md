@@ -38,7 +38,8 @@ A powerful [MCP](https://modelcontextprotocol.io) server for [AnythingLLM](https
 
 - **Node.js** 18+
 - **AnythingLLM** or **LM Studio** 0.3+ (with MCP support)
-- **Python 3** with `chromadb` and `llama-cpp-python` (for RAG only — optional)
+- **Python 3** with `chromadb` (for RAG only — optional)
+- **Ollama** with `nomic-embed-text` model (for RAG embeddings — optional)
 
 ## Quick Start
 
@@ -104,21 +105,19 @@ You can also set it via environment variable: `ANYTHINGLLM_API_KEY=your-key`.
 
 ### RAG Setup (optional)
 
-For semantic search, install Python dependencies:
+For semantic search, install the Python dependency:
 
 ```bash
-pip install chromadb llama-cpp-python
+pip install chromadb
 ```
 
-Then download an embedding model:
+Then install [Ollama](https://ollama.com) and pull the embedding model:
 
 ```bash
-mkdir -p models
-wget -O models/nomic-embed-text-v1.5.Q8_0.gguf \
-  https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF/resolve/main/nomic-embed-text-v1.5.Q8_0.gguf
+ollama pull nomic-embed-text
 ```
 
-The RAG engine loads the model directly — no external server required.
+Make sure Ollama is running (`ollama serve`) before using RAG tools. The RAG engine calls Ollama's local API for embeddings — no cloud required.
 
 ## Tools
 
@@ -132,7 +131,7 @@ The RAG engine loads the model directly — no external server required.
 | `web_search` | Search via DuckDuckGo (free) or Brave API |
 | `wiki` | Search, read, write, list wiki pages |
 | `wiki_ingest` | Advanced wiki management (ingest, lint, update index) |
-| `rag` | Semantic search (ChromaDB + local GGUF embeddings) |
+| `rag` | Semantic search (ChromaDB + Ollama embeddings) |
 | `planner` | Create and execute phased plans with blocking questions |
 | `compact` | Memory compaction + session archiving |
 | `anythingllm` | Export chat sessions from AnythingLLM API (list/export/export-all) |
@@ -144,13 +143,14 @@ AnythingLLM compatibility aliases are also registered: `filesystem-read-text-fil
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AGENT_WORKSPACE` | parent of server dir | Working directory. All file ops scoped here. |
+| `AGENT_WORKSPACE` | server dir | Working directory. All file ops scoped here. |
 | `ANYTHINGLLM_API_KEY` | — | AnythingLLM API key (or use `api-key.json`) |
 | `BRAVE_API_KEY` | — | Optional Brave Search API key |
 | `RAG_PYTHON_PATH` | auto-detected | Python executable with chromadb installed |
 | `LM_STUDIO_CONVERSATIONS_DIR` | `~/.lmstudio/conversations` | LM Studio sessions directory |
-| `CHROMA_DATA_DIR` | `{WORKSPACE}/rag/chroma_data` | ChromaDB persistence directory |
-| `EMBEDDING_MODEL_PATH` | `{WORKSPACE}/models/nomic-embed-text-v1.5.Q8_0.gguf` | Path to GGUF embedding model |
+| `CHROMA_DATA_DIR` | `{server_dir}/rag/chroma_data` | ChromaDB persistence directory |
+| `OLLAMA_EMBED_URL` | `http://localhost:11434/api/embeddings` | Ollama embeddings API endpoint |
+| `OLLAMA_EMBED_MODEL` | `nomic-embed-text` | Ollama model used for embeddings |
 | `MCP_DEBUG` | — | Set to `1` for verbose debug logging |
 
 ## Project Structure
