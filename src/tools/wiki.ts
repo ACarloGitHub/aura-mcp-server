@@ -27,18 +27,18 @@ export async function wikiTool(args: WikiArgs): Promise<any> {
   try {
     switch (action) {
       case "search":
-        if (!query) throw new Error("Parametro 'query' richiesto per search");
+        if (!query) throw new Error("Parameter 'query' required for search");
         return await searchWiki(query, maxResults);
       case "read":
-        if (!pagePath) throw new Error("Parametro 'path' richiesto per read");
+        if (!pagePath) throw new Error("Parameter 'path' required for read");
         return await readWikiPage(pagePath);
       case "write":
-        if (!pagePath || !content) throw new Error("Parametri 'path' e 'content' richiesti per write");
+        if (!pagePath || !content) throw new Error("Parameters 'path' and 'content' required for write");
         return await writeWikiPage(pagePath, content);
       case "list":
         return await listWikiPages(maxResults);
       default:
-        throw new Error(`Azione wiki sconosciuta: ${action}`);
+        throw new Error(`Unknown wiki action: ${action}`);
     }
   } catch (err) {
     return formatError(err);
@@ -68,22 +68,22 @@ async function searchWiki(query: string, maxResults: number): Promise<any> {
           });
         }
       } catch {
-        // skip file problematici
+        // skip problematic files
       }
       if (results.length >= maxResults) break;
     }
 
     if (results.length === 0) {
-      return textResult(`Nessun risultato trovato per "${query}" nella wiki.`);
+      return textResult(`No results found for "${query}" in the wiki.`);
     }
 
     const formatted = results.map((r, i) =>
-      `${i + 1}. **${r.title}** (${r.path})\n   ${r.snippet}\n   _Modificato: ${r.modified}_`
+      `${i + 1}. **${r.title}** (${r.path})\n   ${r.snippet}\n   _Modified: ${r.modified}_`
     ).join("\n\n");
 
-    return textResult(`🔍 Risultati per "${query}" (${results.length} trovati):\n\n${formatted}`);
+    return textResult(`🔍 Results for "${query}" (${results.length} found):\n\n${formatted}`);
   } catch (error) {
-    throw new Error(`Errore ricerca wiki: ${(error as Error).message}`);
+    throw new Error(`Wiki search error: ${(error as Error).message}`);
   }
 }
 
@@ -93,7 +93,7 @@ async function readWikiPage(pagePath: string): Promise<any> {
   const fullPath = resolve(wikiRoot, cleanPath);
 
   if (!fullPath.startsWith(wikiRoot)) {
-    return formatError(new Error("Path non valido: fuori dalla wiki"));
+    return formatError(new Error("Invalid path: outside wiki root"));
   }
 
   try {
@@ -102,7 +102,7 @@ async function readWikiPage(pagePath: string): Promise<any> {
     return textResult(`📄 ${cleanPath}\n_Modificato: ${stats.mtime.toISOString().split("T")[0]}_\n\n---\n\n${content}`);
   } catch {
     return {
-      content: [{ type: "text", text: `Pagina non trovata: ${cleanPath}` }],
+      content: [{ type: "text", text: `Page not found: ${cleanPath}` }],
       isError: true,
     };
   }
@@ -114,15 +114,15 @@ async function writeWikiPage(pagePath: string, content: string): Promise<any> {
   const fullPath = resolve(wikiRoot, cleanPath);
 
   if (!fullPath.startsWith(wikiRoot)) {
-    return formatError(new Error("Path non valido: fuori dalla wiki"));
+    return formatError(new Error("Invalid path: outside wiki root"));
   }
 
   try {
     await mkdir(dirname(fullPath), { recursive: true });
     await writeFile(fullPath, content, "utf-8");
-    return textResult(`✅ Pagina salvata: ${cleanPath}`);
+    return textResult(`✅ Page saved: ${cleanPath}`);
   } catch (error) {
-    throw new Error(`Errore scrittura wiki: ${(error as Error).message}`);
+    throw new Error(`Wiki write error: ${(error as Error).message}`);
   }
 }
 
@@ -149,9 +149,9 @@ async function listWikiPages(maxResults: number): Promise<any> {
     }
 
     const formatted = results.map((r, i) => `${i + 1}. **${r.title}** (${r.path}) - _${r.modified}_`).join("\n");
-    return textResult(`📚 Pagine nella wiki (${results.length}/${pages.length} mostrate):\n\n${formatted}`);
+    return textResult(`📚 Pages in the wiki (${results.length}/${pages.length} shown):\n\n${formatted}`);
   } catch (error) {
-    throw new Error(`Errore elenco wiki: ${(error as Error).message}`);
+    throw new Error(`Wiki list error: ${(error as Error).message}`);
   }
 }
 
@@ -170,7 +170,7 @@ async function findAllPages(dir: string): Promise<string[]> {
       }
     }
   } catch {
-    // Directory potrebbe non esistere
+    // Directory may not exist
   }
   return pages;
 }

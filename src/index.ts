@@ -21,108 +21,38 @@ import { compactTool } from "./tools/compact.js";
 import { anythingllmTool } from "./tools/anythingllm.js";
 import { sendWinRTToast } from "./tools/notify.js";
 import { notifyTool } from "./tools/notify.js";
+import { appendLogWithRotation } from "./utils/helpers.js";
 
 // ============================================================
-// TOOL ALIASES per AnythingLLM compatibilita' (descrizioni minimali)
+// No aliases exposed. tools/list contains only canonical names.
 // ============================================================
-const ALIASES: Tool[] = [
-  {
-    name: "filesystem-read-text-file",
-    description: "Alias for read. Reads a file. Params: path, offset, limit.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        path: { type: "string", description: "File path" },
-        offset: { type: "number", description: "Start line (optional)" },
-        limit: { type: "number", description: "Max lines (optional)" },
-      },
-      required: ["path"],
-    },
-  },
-  {
-    name: "filesystem-write-text-file",
-    description: "Alias for write. Writes a file. Params: path, content.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        path: { type: "string", description: "File path" },
-        content: { type: "string", description: "Content" },
-      },
-      required: ["path", "content"],
-    },
-  },
-  {
-    name: "filesystem-edit-text-file",
-    description: "Edit a file. Params: path, search/old_string, replace/new_string.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        path: { type: "string", description: "File path" },
-        file_path: { type: "string", description: "Alternative to path" },
-        search: { type: "string", description: "Text to find" },
-        old_string: { type: "string", description: "Alias search" },
-        match: { type: "string", description: "Alias search" },
-        oldText: { type: "string", description: "Alias search" },
-        replace: { type: "string", description: "Replacement text" },
-        new_string: { type: "string", description: "Alias replace" },
-        content: { type: "string", description: "Alias replace" },
-        newText: { type: "string", description: "Alias replace" },
-      },
-      required: [],
-    },
-  },
-  {
-    name: "filesystem-list-directory",
-    description: "List directory contents. Params: path/directory/folder/dir.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        path: { type: "string", description: "Directory path" },
-        directory: { type: "string", description: "Alias path" },
-        folder: { type: "string", description: "Alias path" },
-        dir: { type: "string", description: "Alias path" },
-      },
-      required: [],
-    },
-  },
-];
 
 // ============================================================
-// TOOL SCHEMAS (compatti per preservare contesto LLM)
+// TOOL SCHEMAS (compact to preserve LLM context)
 // ============================================================
 const TOOLS: Tool[] = [
   {
     name: "edit",
-    description: "Edit an existing file. Params: path, search/old_string, replace/new_string.",
+    description: "Edit an existing file by replacing `search` with `replace` (first occurrence).",
     inputSchema: {
       type: "object",
       properties: {
         path: { type: "string", description: "File path" },
-        file_path: { type: "string", description: "Alternative to path" },
-        search: { type: "string", description: "Text to find" },
-        old_string: { type: "string", description: "Alias search" },
-        match: { type: "string", description: "Alias search" },
-        oldText: { type: "string", description: "Alias search" },
+        search: { type: "string", description: "Exact text to find" },
         replace: { type: "string", description: "Replacement text" },
-        new_string: { type: "string", description: "Alias replace" },
-        content: { type: "string", description: "Alias replace" },
-        newText: { type: "string", description: "Alias replace" },
       },
-      required: [],
+      required: ["path", "search", "replace"],
     },
   },
   {
     name: "list_dir",
-    description: "List directory contents. Params: path/directory/folder/dir.",
+    description: "List contents of a directory.",
     inputSchema: {
       type: "object",
       properties: {
         path: { type: "string", description: "Directory path" },
-        directory: { type: "string", description: "Alias path" },
-        folder: { type: "string", description: "Alias path" },
-        dir: { type: "string", description: "Alias path" },
       },
-      required: [],
+      required: ["path"],
     },
   },
   {
@@ -204,7 +134,7 @@ const TOOLS: Tool[] = [
       type: "object",
       properties: {
         path: { type: "string", description: "Path of the file to write" },
-        content: { type: "string", description: "Content da scrivere" },
+        content: { type: "string", description: "Content to write" },
       },
       required: ["path", "content"],
     },
@@ -222,94 +152,34 @@ const TOOLS: Tool[] = [
       required: ["query"],
     },
   },
-  {
-    name: "wiki",
-    description: "Local wiki. Actions: search, read, write, list. Params: action, query/path/content, maxResults.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        action: { type: "string", enum: ["search", "read", "write", "list"], description: "Action to perform" },
-        query: { type: "string", description: "Search query (per action=search)" },
-        path: { type: "string", description: "Page path, e.g. 'projects/idea.md' (for action=read/write)" },
-        content: { type: "string", description: "Content markdown (per action=write)" },
-        maxResults: { type: "number", description: "Max number of results (optional, default 10)" },
-      },
-      required: ["action"],
-    },
-  },
-  {
-    name: "rag",
-    description: "Semantic search via ChromaDB + Ollama embeddings. Actions: search, add, list, delete, collections, ingest_sessions.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        action: { type: "string", enum: ["search", "add", "list", "delete", "collections", "ingest_sessions"], description: "RAG action" },
-        collection: { type: "string", description: "Collection name (for action=search/add/list/delete)" },
-        query: { type: "string", description: "Search query semantica (per action=search)" },
-        id: { type: "string", description: "Document ID (for action=add/delete)" },
-        text: { type: "string", description: "Document text (for action=add)" },
-        metadata: { type: "string", description: "JSON metadata string (for action=add)" },
-        limit: { type: "number", description: "Max results (default 5 for search, 50 for list)" },
-        filter: { type: "string", description: "JSON metadata filter (for action=search)" },
-        folder: { type: "string", description: "Specific session folder (for action=ingest_sessions)" },
-        reindex: { type: "boolean", description: "Re-index everything from scratch (for action=ingest_sessions)" },
-      },
-      required: ["action"],
-    },
-  },
-  {
-    name: "wiki_ingest",
-    description: "Advanced Karpathy-style wiki. Actions: ingest, query, lint, update_index, update_log.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        action: { type: "string", enum: ["ingest", "query", "lint", "update_index", "update_log"], description: "Azione" },
-        source: { type: "string", description: "File path raw (per ingest) o descrizione operazione (per update_log)" },
-        query_text: { type: "string", description: "Query text (for action=query)" },
-      },
-      required: ["action"],
-    },
-  },
-  {
-    name: "planner",
-    description: "Phased project planner. Actions: create, read, list, update, delete, next, status. Saved in plans/.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        action: { type: "string", enum: ["create", "read", "list", "update", "delete", "next", "status"], description: "Azione" },
-        name: { type: "string", description: "Plan name" },
-        content: { type: "string", description: "Content markdown del piano (per create/update)" },
-        answer: { type: "string", description: "Answer to a blocking question (for action=next)" },
-      },
-      required: ["action"],
-    },
-  },
-  {
-    name: "compact",
-    description: "Compact memory. Actions: memory(auto), status, list. Default threshold: 300 lines.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        action: { type: "string", enum: ["memory", "status", "list"], description: "Azione" },
-        threshold: { type: "number", description: "Line threshold for memory compaction (default: 300)" },
-      },
-      required: ["action"],
-    },
-  },
-  {
-    name: "anythingllm",
-    description: "Export AnythingLLM chat sessions. Actions: list, export, export-all. API at localhost:3001.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        action: { type: "string", enum: ["list", "export", "export-all"], description: "Azione" },
-        workspace: { type: "string", description: "Workspace slug (for export)" },
-        thread: { type: "string", description: "Thread slug (optional, for export)" },
-        apiKey: { type: "string", description: "AnythingLLM API key (optional, uses ANYTHINGLLM_API_KEY env var or api-key.json)" },
-      },
-      required: ["action"],
-    },
-  },
+  { name: "wiki_search", description: "Search text across local wiki pages.", inputSchema: { type: "object", properties: { query: { type: "string", description: "Text to search for" }, maxResults: { type: "number", description: "Max results (default 10)" } }, required: ["query"] } },
+  { name: "wiki_read", description: "Read a local wiki page.", inputSchema: { type: "object", properties: { path: { type: "string", description: "Page path, e.g. 'projects/idea.md'" } }, required: ["path"] } },
+  { name: "wiki_write", description: "Create or overwrite a local wiki page.", inputSchema: { type: "object", properties: { path: { type: "string", description: "Page path" }, content: { type: "string", description: "Markdown content" } }, required: ["path", "content"] } },
+  { name: "wiki_list", description: "List all local wiki pages.", inputSchema: { type: "object", properties: { maxResults: { type: "number", description: "Max results (optional)" } }, required: [] } },
+  { name: "rag_search", description: "Semantic search inside a ChromaDB collection.", inputSchema: { type: "object", properties: { collection: { type: "string", description: "Collection name" }, query: { type: "string", description: "Semantic query" }, limit: { type: "number", description: "Max results (default 5)" }, filter: { type: "string", description: "JSON metadata filter (optional)" } }, required: ["collection", "query"] } },
+  { name: "rag_add", description: "Add a document to a RAG collection.", inputSchema: { type: "object", properties: { collection: { type: "string", description: "Collection name" }, id: { type: "string", description: "Unique document ID" }, text: { type: "string", description: "Document text" }, metadata: { type: "string", description: "JSON metadata string (optional)" } }, required: ["collection", "id", "text"] } },
+  { name: "rag_list", description: "List documents inside a RAG collection.", inputSchema: { type: "object", properties: { collection: { type: "string", description: "Collection name" }, limit: { type: "number", description: "Max results (default 50)" } }, required: ["collection"] } },
+  { name: "rag_delete", description: "Delete a document from a RAG collection.", inputSchema: { type: "object", properties: { collection: { type: "string", description: "Collection name" }, id: { type: "string", description: "Document ID to delete" } }, required: ["collection", "id"] } },
+  { name: "rag_collections", description: "List all available ChromaDB collections.", inputSchema: { type: "object", properties: {}, required: [] } },
+  { name: "rag_ingest_sessions", description: "Index AnythingLLM session exports into a RAG collection.", inputSchema: { type: "object", properties: { folder: { type: "string", description: "Specific session folder (optional)" }, reindex: { type: "boolean", description: "Re-index from scratch" } }, required: [] } },
+  { name: "wiki_ingest_raw", description: "Ingest a raw file into the advanced wiki.", inputSchema: { type: "object", properties: { source: { type: "string", description: "Path of the raw file" } }, required: ["source"] } },
+  { name: "wiki_ingest_query", description: "Semantic query against the advanced wiki.", inputSchema: { type: "object", properties: { query_text: { type: "string", description: "Query text" } }, required: ["query_text"] } },
+  { name: "wiki_ingest_lint", description: "Lint pass over the advanced wiki (integrity check).", inputSchema: { type: "object", properties: {}, required: [] } },
+  { name: "wiki_ingest_update_index", description: "Rebuild the index of the advanced wiki.", inputSchema: { type: "object", properties: {}, required: [] } },
+  { name: "wiki_ingest_update_log", description: "Append an entry to the advanced wiki operation log.", inputSchema: { type: "object", properties: { source: { type: "string", description: "Operation description" } }, required: ["source"] } },
+  { name: "planner_create", description: "Create a new plan stored in plans/.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" }, content: { type: "string", description: "Plan markdown content" } }, required: ["name", "content"] } },
+  { name: "planner_read", description: "Read an existing plan.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" } }, required: ["name"] } },
+  { name: "planner_list", description: "List all plans.", inputSchema: { type: "object", properties: {}, required: [] } },
+  { name: "planner_update", description: "Update the content of an existing plan.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" }, content: { type: "string", description: "New markdown content" } }, required: ["name", "content"] } },
+  { name: "planner_delete", description: "Delete a plan.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" } }, required: ["name"] } },
+  { name: "planner_next", description: "Get next blocking step of a plan. Optionally answers an open question.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" }, answer: { type: "string", description: "Answer to a blocking question (optional)" } }, required: ["name"] } },
+  { name: "planner_status", description: "Concise progress status of a plan.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" } }, required: ["name"] } },
+  { name: "compact_memory", description: "Auto-compact memory beyond the line threshold.", inputSchema: { type: "object", properties: { threshold: { type: "number", description: "Line threshold (default 300)" } }, required: [] } },
+  { name: "compact_status", description: "Status of memory files (sizes, last compaction).", inputSchema: { type: "object", properties: {}, required: [] } },
+  { name: "compact_list", description: "List already compacted sessions.", inputSchema: { type: "object", properties: {}, required: [] } },
+  { name: "anythingllm_list", description: "List AnythingLLM workspaces (requires API at localhost:3001).", inputSchema: { type: "object", properties: { apiKey: { type: "string", description: "API key (optional, uses ANYTHINGLLM_API_KEY env var)" } }, required: [] } },
+  { name: "anythingllm_export", description: "Export threads of an AnythingLLM workspace.", inputSchema: { type: "object", properties: { workspace: { type: "string", description: "Workspace slug" }, thread: { type: "string", description: "Thread slug (optional)" }, apiKey: { type: "string", description: "API key (optional)" } }, required: ["workspace"] } },
+  { name: "anythingllm_export_all", description: "Export all AnythingLLM workspaces.", inputSchema: { type: "object", properties: { apiKey: { type: "string", description: "API key (optional)" } }, required: [] } },
   {
     name: "notify",
     description: "Desktop notification + beep. Params: message, title, sound(boolean, default true).",
@@ -326,13 +196,15 @@ const TOOLS: Tool[] = [
 ];
 
 // ============================================================
-// FUNZIONE isAnythingLLMForeground (Win32 API via PowerShell EncodedCommand)
+// isAnythingLLMForeground function (Win32 API via PowerShell EncodedCommand)
 // ============================================================
-function isAnythingLLMForeground(): boolean {
+import { execFile as _execFile } from "child_process";
+import { promisify as _promisify } from "util";
+const execFileAsync = _promisify(_execFile);
+
+async function isAnythingLLMForeground(): Promise<boolean> {
   if (process.platform !== "win32") return true;
   try {
-    const { execSync } = require("child_process");
-    // Script passato come EncodedCommand (base64 UTF-16LE) per evitare problemi di escaping
     const script = [
       'Add-Type @"',
       'using System;',
@@ -351,40 +223,38 @@ function isAnythingLLMForeground(): boolean {
       '$proc = Get-Process -Id $pid -ErrorAction SilentlyContinue',
       'Write-Output "$($sb.ToString())|$($proc.ProcessName)"',
     ].join('\n');
-
     const encoded = Buffer.from(script, "utf-16le").toString("base64");
-    const result = execSync(
-      `powershell -NoProfile -EncodedCommand ${encoded}`,
-      { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"], timeout: 4000 }
-    ).trim();
-
-    return result.toLowerCase().includes("anythingllm");
+    const { stdout } = await execFileAsync(
+      "powershell",
+      ["-NoProfile", "-EncodedCommand", encoded],
+      { encoding: "utf-8", timeout: 4000 }
+    );
+    return stdout.trim().toLowerCase().includes("anythingllm");
   } catch {
-    return true; // in caso di errore, non notificare per sicurezza
+    return true;
   }
 }
 
-// Debounce: max 1 notifica ogni 8 secondi
+// Debounce: max 1 notification every 8 seconds
 let lastAutoNotifyTime = 0;
-// Tool che NON devono generare autoNotify (troppo frequenti o già gestiti)
+// Tools that should NOT trigger autoNotify (too frequent or already handled)
 const SILENT_TOOLS = new Set(["read", "list_dir", "filesystem-read-text-file", "filesystem-list-directory", "notify", "exec_poll", "exec_list", "exec_clean"]);
 
 // ============================================================
-// FUNZIONE autoNotify (fire-and-forget, con debounce e filtro tool)
+// autoNotify function (fire-and-forget, with debounce and tool filter)
 // ============================================================
 function autoNotify(name: string, rawResult: any): void {
-  // Salta tool silenziosi (troppo frequenti o già gestiti da notifyTool)
+  if (process.env.MCP_DISABLE_AUTONOTIFY === "1") return;
   if (SILENT_TOOLS.has(name)) return;
 
-  // Debounce: max 1 notifica ogni 8 secondi (aggiornato subito, sincrono)
   const now = Date.now();
   if (now - lastAutoNotifyTime < 8000) return;
   lastAutoNotifyTime = now;
 
   void (async () => {
     try {
-      if (!isAnythingLLMForeground()) {
-
+      const isForeground = await isAnythingLLMForeground();
+      if (!isForeground) {
         let body = `Tool "${name}" completed`;
         if (rawResult?.content && Array.isArray(rawResult.content) && rawResult.content.length > 0) {
           const firstText = rawResult.content[0]?.text;
@@ -402,7 +272,7 @@ function autoNotify(name: string, rawResult: any): void {
 }
 
 // ============================================================
-// SERVER MCP
+// MCP SERVER
 // ============================================================
 const server = new Server(
   {
@@ -416,25 +286,22 @@ const server = new Server(
   }
 );
 
-// Handler per listare i tool disponibili
+// Handler to list available tools
 server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return { tools: [...TOOLS, ...ALIASES] };
+  return { tools: TOOLS };
 });
 
-// Handler per eseguire i tool
+// Handler to execute tools
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   const start = Date.now();
 
-  // Log su file per debug remoto — path assoluto nel workspace
   const logLine = `[${new Date().toISOString()}] CALL ${name} ${JSON.stringify(args)}\n`;
-  try {
-    const { appendFile } = await import("fs/promises");
-    const logPath = process.env.AGENT_WORKSPACE
-      ? `${process.env.AGENT_WORKSPACE}/mcp-server.log`
-      : "mcp-server.log";
-    await appendFile(logPath, logLine);
-  } catch { /* ignore */ }
+  const logPath = process.env.AGENT_WORKSPACE
+    ? `${process.env.AGENT_WORKSPACE}/mcp-server.log`
+    : "mcp-server.log";
+  const maxLogMB = Number(process.env.MCP_LOG_MAX_MB ?? 10);
+  await appendLogWithRotation(logPath, logLine, maxLogMB);
 
   try {
     let result: any;
@@ -469,38 +336,36 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "web_search":
         result = await webSearchTool(args as any);
         break;
-      case "wiki":
-        result = await wikiTool(args as any);
-        break;
-      case "rag":
-        result = await ragTool(args as any);
-        break;
-      case "wiki_ingest":
-        result = await wikiIngestTool(args as any);
-        break;
-      case "compact":
-        result = await compactTool(args as any);
-        break;
-      case "planner":
-        result = await plannerTool(args as any);
-        break;
-      case "anythingllm":
-        result = await anythingllmTool(args as any);
-        break;
+      case "wiki_search": result = await wikiTool({ ...(args as any), action: "search" } as any); break;
+      case "wiki_read": result = await wikiTool({ ...(args as any), action: "read" } as any); break;
+      case "wiki_write": result = await wikiTool({ ...(args as any), action: "write" } as any); break;
+      case "wiki_list": result = await wikiTool({ ...(args as any), action: "list" } as any); break;
+      case "rag_search": result = await ragTool({ ...(args as any), action: "search" } as any); break;
+      case "rag_add": result = await ragTool({ ...(args as any), action: "add" } as any); break;
+      case "rag_list": result = await ragTool({ ...(args as any), action: "list" } as any); break;
+      case "rag_delete": result = await ragTool({ ...(args as any), action: "delete" } as any); break;
+      case "rag_collections": result = await ragTool({ ...(args as any), action: "collections" } as any); break;
+      case "rag_ingest_sessions": result = await ragTool({ ...(args as any), action: "ingest_sessions" } as any); break;
+      case "wiki_ingest_raw": result = await wikiIngestTool({ ...(args as any), action: "ingest" } as any); break;
+      case "wiki_ingest_query": result = await wikiIngestTool({ ...(args as any), action: "query" } as any); break;
+      case "wiki_ingest_lint": result = await wikiIngestTool({ ...(args as any), action: "lint" } as any); break;
+      case "wiki_ingest_update_index": result = await wikiIngestTool({ ...(args as any), action: "update_index" } as any); break;
+      case "wiki_ingest_update_log": result = await wikiIngestTool({ ...(args as any), action: "update_log" } as any); break;
+      case "compact_memory": result = await compactTool({ ...(args as any), action: "memory" } as any); break;
+      case "compact_status": result = await compactTool({ ...(args as any), action: "status" } as any); break;
+      case "compact_list": result = await compactTool({ ...(args as any), action: "list" } as any); break;
+      case "planner_create": result = await plannerTool({ ...(args as any), action: "create" } as any); break;
+      case "planner_read": result = await plannerTool({ ...(args as any), action: "read" } as any); break;
+      case "planner_list": result = await plannerTool({ ...(args as any), action: "list" } as any); break;
+      case "planner_update": result = await plannerTool({ ...(args as any), action: "update" } as any); break;
+      case "planner_delete": result = await plannerTool({ ...(args as any), action: "delete" } as any); break;
+      case "planner_next": result = await plannerTool({ ...(args as any), action: "next" } as any); break;
+      case "planner_status": result = await plannerTool({ ...(args as any), action: "status" } as any); break;
+      case "anythingllm_list": result = await anythingllmTool({ ...(args as any), action: "list" } as any); break;
+      case "anythingllm_export": result = await anythingllmTool({ ...(args as any), action: "export" } as any); break;
+      case "anythingllm_export_all": result = await anythingllmTool({ ...(args as any), action: "export-all" } as any); break;
       case "notify":
         result = await notifyTool(args as any);
-        break;
-      case "filesystem-read-text-file":
-        result = await readTool(args as any);
-        break;
-      case "filesystem-write-text-file":
-        result = await writeTool(args as any);
-        break;
-      case "filesystem-edit-text-file":
-        result = await editTool(args as any);
-        break;
-      case "filesystem-list-directory":
-        result = await listDirTool(args as any);
         break;
       default:
         throw new Error(`Unknown tool: ${name}`);
@@ -535,6 +400,23 @@ async function main() {
   process.on("unhandledRejection", (reason) => {
     console.error("[FATAL unhandledRejection]", reason);
   });
+
+  let shuttingDown = false;
+  const cleanupAndExit = (reason: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.error(`[MCP] shutdown triggered by ${reason}, cleaning background jobs`);
+    Promise.resolve()
+      .then(() => execCleanTool({ all: true } as any))
+      .catch(() => undefined)
+      .finally(() => {
+        setTimeout(() => process.exit(0), 200);
+      });
+  };
+  process.stdin.on("end", () => cleanupAndExit("stdin end"));
+  process.stdin.on("close", () => cleanupAndExit("stdin close"));
+  process.on("SIGTERM", () => cleanupAndExit("SIGTERM"));
+  process.on("SIGINT", () => cleanupAndExit("SIGINT"));
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

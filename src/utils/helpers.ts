@@ -4,7 +4,7 @@ import { join, resolve, dirname, normalize as pathNormalize } from "path";
 import { existsSync } from "fs";
 
 /**
- * Rileva se siamo su WSL (Windows Subsystem for Linux).
+ * Detect if running under WSL (Windows Subsystem for Linux).
  */
 function isWSL(): boolean {
   return !!process.env.WSL_DISTRO_NAME || !!process.env.WSL_INTEROP ||
@@ -12,11 +12,11 @@ function isWSL(): boolean {
 }
 
 /**
- * Converte un path Windows in path Unix SOLO se su WSL.
- * Su Windows nativo lascia il path Windows cosi com'e'.
+ * Convert a Windows path to Unix path ONLY when running under WSL.
+ * On native Windows, leave the Windows path as-is.
  */
 export function normalizeWindowsPath(p: string): string {
-  // Se non e' un path Windows, normalizza solo i backslash
+  // If not a Windows path, just normalize backslashes
   if (!/^[A-Za-z]:[\\\/]/.test(p)) {
     return p.replace(/\\/g, "/");
   }
@@ -29,21 +29,21 @@ export function normalizeWindowsPath(p: string): string {
     return `/mnt/${drive}${rest}`;
   }
 
-  // Su Windows nativo: lascia cosi com'e', solo normalizza separatori interni
+  // On native Windows: leave as-is, just normalize internal separators
   return p;
 }
 
 /**
- * Determina il workspace root in modo robusto.
- * Priorita': env AGENT_WORKSPACE > directory del server > home dell'utente.
- * Su Windows nativo: risolve con path Windows.
- * Su WSL: risolve con path Unix (/mnt/...).
+ * Determine the workspace root robustly.
+ * Priority: env AGENT_WORKSPACE > server directory > user home.
+ * On native Windows: resolves with Windows paths.
+ * On WSL: resolves with Unix paths (/mnt/...).
  */
 export function getWorkspaceRoot(): string {
   if (process.env.AGENT_WORKSPACE) {
     return resolve(normalizeWindowsPath(process.env.AGENT_WORKSPACE));
   }
-  // Se siamo in dist/, risali di 2 livelli per arrivare alla root del progetto
+  // If running from dist/, go up 2 levels to reach project root
   // @ts-ignore — import.meta.url valido in ESM Node16 ma TS lo rifiuta
   const distDir = dirname(fileURLToPath(import.meta.url));
   const serverDir = dirname(distDir);
@@ -51,9 +51,9 @@ export function getWorkspaceRoot(): string {
 }
 
 /**
- * Risolve un percorso relativo al workspace o assoluto.
- * Accetta path Windows (C:\...) o Unix (/mnt/... o /home/...).
- * Su Windows nativo restituisce path Windows. Su WSL restituisce path Unix.
+ * Resolve a path relative to the workspace or absolute.
+ * Accepts Windows (C:\...) or Unix (/mnt/... or /home/...) paths.
+ * Returns Windows paths on native Windows. Returns Unix paths on WSL.
  */
 export function resolveWorkspacePath(relOrAbs: string): string {
   const normalized = normalizeWindowsPath(relOrAbs);
@@ -64,7 +64,7 @@ export function resolveWorkspacePath(relOrAbs: string): string {
 }
 
 /**
- * Verifica se un percorso e' assoluto (Unix o Windows).
+ * Check whether a path is absolute (Unix or Windows).
  */
 export function isAbsolutePath(p: string): boolean {
   const n = pathNormalize(p);
@@ -72,7 +72,7 @@ export function isAbsolutePath(p: string): boolean {
 }
 
 /**
- * Trunca testo con suffisso.
+ * Truncate text with a suffix.
  */
 export function truncateText(text: string, maxLength: number, suffix = "..."): string {
   if (text.length <= maxLength) return text;
@@ -80,25 +80,54 @@ export function truncateText(text: string, maxLength: number, suffix = "..."): s
 }
 
 /**
- * Formatta un errore per il ritorno MCP.
+ * Append a single line to a log file with size-based rotation.
+ * When the file exceeds maxSizeMB, it's renamed to `.1` (overwriting any
+ * existing `.1`) and a fresh file starts. All operations are best-effort:
+ * logging failures must never block the tool call return path.
+ */
+export async function appendLogWithRotation(
+  filepath: string,
+  line: string,
+  maxSizeMB = 10
+): Promise<void> {
+  const { appendFile, stat, rename, unlink } = await import("fs/promises");
+  try {
+    const stats = await stat(filepath);
+    if (stats.size >= maxSizeMB * 1024 * 1024) {
+      const rotated = filepath + ".1";
+      try { await unlink(rotated); } catch { /* no previous rotation file, fine */ }
+      try { await rename(filepath, rotated); } catch { /* race condition, ignore */ }
+    }
+  } catch {
+    // file does not exist yet — it will be created by appendFile
+  }
+  try {
+    await appendFile(filepath, line);
+  } catch {
+    // swallow logging errors
+  }
+}
+
+/**
+ * Format an error for MCP return.
  */
 export function formatError(err: unknown): { content: Array<{ type: "text"; text: string }>; isError: true } {
   const msg = err instanceof Error ? err.message : String(err);
   return {
-    content: [{ type: "text", text: `Errore: ${msg}` }],
+    content: [{ type: "text", text: `Error: ${msg}` }],
     isError: true,
   };
 }
 
 /**
- * Crea una risposta MCP di testo.
+ * Create a text MCP response.
  */
 export function textResult(text: string): { content: Array<{ type: "text"; text: string }> } {
   return { content: [{ type: "text", text }] };
 }
 
 /**
- * Rileva se un buffer e' probabilmente binario.
+ * Detect if a buffer is likely binary.
  */
 export function isBinaryBuffer(buf: Buffer, sampleSize = 512): boolean {
   if (buf.length === 0) return false;
@@ -110,8 +139,8 @@ export function isBinaryBuffer(buf: Buffer, sampleSize = 512): boolean {
 }
 
 /**
- * Trova python3 o python nel PATH di sistema.
- * Lancia 'where' su Windows o 'which' su Unix.
+ * Find python3 or python in the system PATH.
+ * Runs 'where' on Windows or 'which' on Unix.
  */
 function findPythonInPath(): string | null {
   try {
@@ -130,7 +159,7 @@ function findPythonInPath(): string | null {
 }
 
 /**
- * Verifica se un eseguibile python esiste e puo' importare chromadb.
+ * Check if a python executable exists and can import chromadb.
  */
 function isPythonUsable(pythonPath: string): boolean {
   if (!existsSync(pythonPath)) return false;
@@ -144,20 +173,20 @@ function isPythonUsable(pythonPath: string): boolean {
 }
 
 /**
- * Legge il Python path per RAG da env o cerca nei posti comuni.
- * Supporta WSL, Windows, Linux, macOS.
- * Priorita':
+ * Resolve the Python path for RAG from env or search common locations.
+ * Supports WSL, Windows, Linux, macOS.
+ * Priority:
  *   1. env RAG_PYTHON_PATH
- *   2. .venv/Scripts/python.exe (Windows) o .venv/bin/python (Unix) se esiste
- *   3. python/python3 trovato nel PATH se ha chromadb
- *   4. Fails con errore leggibile se nessuno funziona.
+ *   2. .venv/Scripts/python.exe (Windows) or .venv/bin/python (Unix) if exists
+ *   3. python/python3 found in PATH if it has chromadb
+ *   4. Fails with readable error if none works.
  */
 export function getPythonPath(): string {
   if (process.env.RAG_PYTHON_PATH) {
     if (isPythonUsable(process.env.RAG_PYTHON_PATH)) {
       return process.env.RAG_PYTHON_PATH;
     }
-    console.error(`[WARN] RAG_PYTHON_PATH settato ma non valido: ${process.env.RAG_PYTHON_PATH}`);
+    console.error(`[WARN] RAG_PYTHON_PATH is set but invalid: ${process.env.RAG_PYTHON_PATH}`);
   }
 
   // @ts-ignore
@@ -180,13 +209,13 @@ export function getPythonPath(): string {
     }
   }
 
-  // Cerca nel PATH
+  // Search in PATH
   const pathPython = findPythonInPath();
   if (pathPython && isPythonUsable(pathPython)) {
     return pathPython;
   }
 
-  // Ultimo fallback: prova comandi generici (potrebbero fallire in runtime)
+  // Last fallback: try generic commands (may fail at runtime)
   const generic = process.platform === "win32" ? "python" : "python3";
   return generic;
 }

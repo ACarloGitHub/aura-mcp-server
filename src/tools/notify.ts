@@ -75,7 +75,7 @@ $toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
 export async function notifyTool(args: NotifyArgs): Promise<any> {
   try {
     const title = args.title || "Aura MCP";
-    const message = args.message || "Notifica dal server MCP";
+    const message = args.message || "Notification from MCP server";
     const withSound = args.sound !== false;
 
     let notificationSent = false;
@@ -121,8 +121,8 @@ export async function notifyTool(args: NotifyArgs): Promise<any> {
 
     return textResult(
       notificationSent
-        ? `Notifica inviata: "${title}" — ${message}${withSound ? " (con suono)" : ""}`
-        : `Notifica non inviata (interfaccia grafica non disponibile), ma suono emesso: ${message}`
+        ? `Notification sent: "${title}" — ${message}${withSound ? " (with sound)" : ""}`
+        : `Notification not sent (GUI not available), but sound emitted: ${message}`
     );
   } catch (error) {
     return formatError(error);

@@ -24,7 +24,7 @@ export async function compactTool(args: CompactArgs): Promise<any> {
       case "list":
         return await listCompacted();
       default:
-        throw new Error(`Azione compact sconosciuta: ${args.action}`);
+        throw new Error(`Unknown compact action: ${args.action}`);
     }
   } catch (error) {
     return formatError(error);
@@ -40,12 +40,12 @@ async function memoryCompact(args: CompactArgs): Promise<any> {
   try {
     content = await readFile(memoryPath, "utf-8");
   } catch {
-    return textResult("MEMORY.md non trovato. Niente da compattare.");
+    return textResult("MEMORY.md not found. Nothing to compact.");
   }
 
   const lines = content.split("\n");
   if (lines.length <= threshold) {
-    return textResult(`MEMORY.md: ${lines.length} righe (soglia: ${threshold}). Compattazione non necessaria.`);
+    return textResult(`MEMORY.md: ${lines.length} lines (threshold: ${threshold}). Compaction not needed.`);
   }
 
   const noteIdx = lines.findIndex((l) => /^##\s+Notes?\b/i.test(l));
@@ -66,17 +66,17 @@ async function memoryCompact(args: CompactArgs): Promise<any> {
   let archive = "";
   try {
     archive = await readFile(archivePath, "utf-8");
-  } catch { /* non esiste ancora */ }
+  } catch { /* doesn't exist yet */ }
 
   archive += archiveEntry;
   await writeFile(archivePath, archive, "utf-8");
 
-  const compacted = preserved + `\n\n## Note\n\n[Memoria compattata il ${timestamp}. Cronologia precedente in memory-archive.md]\n`;
+  const compacted = preserved + `\n\n## Note\n\n[Memory compacted on ${timestamp}. Previous history in memory-archive.md]\n`;
   await writeFile(memoryPath, compacted, "utf-8");
 
   const newLines = compacted.split("\n").length;
   return textResult(
-    `Memoria compattata!\n- ${lines.length} righe → ${newLines} righe\n- Archiviato in memory-archive.md\n- Data: ${timestamp}`
+    `Memory compacted!\n- ${lines.length} lines → ${newLines} lines\n- Archived in memory-archive.md\n- Date: ${timestamp}`
   );
 }
 
@@ -90,10 +90,10 @@ async function compactStatus(_args: CompactArgs): Promise<any> {
     const lines = content.split("\n").length;
     const needsCompact = lines > MEMORY_THRESHOLD_DEFAULT;
     results.push(
-      `MEMORY.md: ${lines} righe (soglia: ${MEMORY_THRESHOLD_DEFAULT})${needsCompact ? " - COMPACTION RACCOMANDATA" : ""}`
+      `MEMORY.md: ${lines} righe (soglia: ${MEMORY_THRESHOLD_DEFAULT})${needsCompact ? " - COMPACTION RECOMMENDED" : ""}`
     );
   } catch {
-    results.push("MEMORY.md: non trovato");
+    results.push("MEMORY.md: not found");
   }
 
   const archivePath = resolve(workspace, "memory-archive.md");
@@ -102,15 +102,15 @@ async function compactStatus(_args: CompactArgs): Promise<any> {
     const archSize = Math.round(Buffer.byteLength(content, "utf-8") / 1024);
     results.push(`memory-archive.md: ${archSize} KB`);
   } catch {
-    results.push("memory-archive.md: non esiste ancora");
+    results.push("memory-archive.md: doesn't exist yet");
   }
 
   try {
     const files = await readdir(COMPACTED_DIR());
     const mdFiles = files.filter((f) => f.endsWith(".md"));
-    results.push(`compacted-sessions/: ${mdFiles.length} sessioni compattate`);
+    results.push(`compacted-sessions/: ${mdFiles.length} compacted sessions`);
   } catch {
-    results.push("compacted-sessions/: vuota o non esiste");
+    results.push("compacted-sessions/: empty or does not exist");
   }
 
   return textResult(results.join("\n"));
@@ -121,11 +121,11 @@ async function listCompacted(): Promise<any> {
     const files = await readdir(COMPACTED_DIR());
     const mdFiles = files.filter((f) => f.endsWith(".md")).sort().reverse();
 
-    if (mdFiles.length === 0) return textResult("Nessuna sessione compattata.");
+    if (mdFiles.length === 0) return textResult("No compacted sessions.");
 
     const list = mdFiles.map((f, i) => `${i + 1}. ${f.replace(".md", "")}`).join("\n");
-    return textResult(`Sessioni compattate:\n\n${list}`);
+    return textResult(`Compacted sessions:\n\n${list}`);
   } catch {
-    return textResult("Cartella compacted-sessions/ non trovata.");
+    return textResult("compacted-sessions/ directory not found.");
   }
 }

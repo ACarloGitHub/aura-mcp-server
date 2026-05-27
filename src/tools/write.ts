@@ -7,7 +7,7 @@ interface WriteArgs {
   content: string;
 }
 
-const MAX_CONTENT_LENGTH = 5 * 1024 * 1024; // 5MB max scrittura diretta
+const MAX_CONTENT_LENGTH = 5 * 1024 * 1024; // 5MB max direct write
 
 export async function writeTool(args: WriteArgs): Promise<any> {
   const { path: rawPath, content } = args;
@@ -18,8 +18,8 @@ export async function writeTool(args: WriteArgs): Promise<any> {
       content: [
         {
           type: "text",
-          text: `Contenuto troppo grande (${Math.round(content.length / 1024)}KB > ${MAX_CONTENT_LENGTH / 1024}KB). ` +
-                `Usa il tool exec con redirezione shell per scrivere file grandi.`,
+          text: `Content too large (${Math.round(content.length / 1024)}KB > ${MAX_CONTENT_LENGTH / 1024}KB). ` +
+                `Use the exec tool with shell redirection to write large files.`,
         },
       ],
       isError: true,
@@ -33,13 +33,13 @@ export async function writeTool(args: WriteArgs): Promise<any> {
 
     return {
       content: [
-        { type: "text", text: `File scritto con successo: ${filePath} (${content.length} chars)` },
+        { type: "text", text: `File written successfully: ${filePath} (${content.length} chars)` },
       ],
     };
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     return {
-      content: [{ type: "text", text: `Impossibile scrivere il file: ${msg}` }],
+      content: [{ type: "text", text: `Unable to write file: ${msg}` }],
       isError: true,
     };
   }

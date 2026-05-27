@@ -1,58 +1,58 @@
 #!/usr/bin/env bash
-# install.sh — Setup automatico server MCP su Linux / macOS / WSL
-# Uso: ./install.sh   (deve essere eseguito nella cartella mcp-server/)
+# install.sh — Automatic MCP server setup on Linux / macOS / WSL
+# Usage: ./install.sh   (must be run in the mcp-server/ folder)
 
 set -e
 
 echo "========================================="
-echo " Aura MCP Server — Installazione"
+echo " Aura MCP Server — Installation"
 echo "========================================="
 echo ""
 
-# Verifica Node.js
+# Check Node.js
 if ! command -v node &> /dev/null; then
-    echo "[ERRORE] Node.js non trovato."
-    echo "Installalo:"
+    echo "[ERROR] Node.js not found."
+    echo "Install it:"
     echo "  Ubuntu/Debian: sudo apt install nodejs npm"
     echo "  macOS:        brew install node"
-    echo "  Altrimenti:   https://nodejs.org/ (LTS consigliato)"
+    echo "  Otherwise:    https://nodejs.org/ (LTS recommended)"
     exit 1
 fi
 NODE_VER=$(node --version)
-echo "[OK] Node.js trovato: $NODE_VER"
+echo "[OK] Node.js found: $NODE_VER"
 
-# Verifica npm
+# Check npm
 if ! command -v npm &> /dev/null; then
-    echo "[ERRORE] npm non trovato."
+    echo "[ERROR] npm not found."
     exit 1
 fi
 NPM_VER=$(npm --version)
-echo "[OK] npm trovato: $NPM_VER"
+echo "[OK] npm found: $NPM_VER"
 
-# Installa dipendenze
+# Install dependencies
 echo ""
-echo "[INFO] Installazione dipendenze..."
+echo "[INFO] Installing dependencies..."
 npm install
 
-echo "[OK] Dipendenze installate."
+echo "[OK] Dependencies installed."
 
 # Build TypeScript
 echo ""
-echo "[INFO] Compilazione TypeScript..."
+echo "[INFO] Compiling TypeScript..."
 npm run build
 
-echo "[OK] Build completata."
+echo "[OK] Build completed."
 
-# Crea cartella log
+# Create logs directory
 mkdir -p logs
 
 echo ""
 echo "========================================="
-echo " Installazione completata!"
+echo " Installation completed!"
 echo "========================================="
 echo ""
-echo "Per avviare il server:"
-echo "  ./start.sh          (normale)"
-echo "  ./debug-server.sh   (con log su file)"
+echo "To start the server:"
+echo "  ./start.sh          (normal)"
+echo "  ./debug-server.sh   (with file logging)"
 echo ""
-echo "Il server si connette via stdio — avvialo da AnythingLLM."
+echo "The server connects via stdio — start it from AnythingLLM."

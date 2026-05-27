@@ -22,7 +22,7 @@ export async function readTool(args: ReadArgs): Promise<any> {
     const ext = extname(filePath).toLowerCase();
     const isImage = IMAGE_EXTENSIONS.includes(ext);
 
-    // Prima controlla la dimensione
+    // Check size first
     let size = 0;
     try {
       const s = await stat(filePath);
@@ -36,7 +36,7 @@ export async function readTool(args: ReadArgs): Promise<any> {
         content: [
           {
             type: "text",
-            text: `File troppo grande (${Math.round(size / 1024 / 1024)}MB > ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB): ${filePath}\nSuggerimento: usa exec per processare il file a pezzi.`,
+            text: `File too large (${Math.round(size / 1024 / 1024)}MB > ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB): ${filePath}\nTip: use exec to process the file in chunks.`,
           },
         ],
         isError: true,
@@ -51,7 +51,7 @@ export async function readTool(args: ReadArgs): Promise<any> {
           content: [
             {
               type: "text",
-              text: `Immagine troppo grande (${Math.round(size / 1024)}KB > ${MAX_IMAGE_SIZE_BYTES / 1024}KB): ${filePath}`,
+              text: `Image too large (${Math.round(size / 1024)}KB > ${MAX_IMAGE_SIZE_BYTES / 1024}KB): ${filePath}`,
             },
           ],
           isError: true,
@@ -70,13 +70,13 @@ export async function readTool(args: ReadArgs): Promise<any> {
       };
     }
 
-    // Rileva binario
+    // Detect binary
     if (isBinaryBuffer(content)) {
       return {
         content: [
           {
             type: "text",
-            text: `File binario rilevato (${filePath}). Non puo' essere letto come testo.`,
+            text: `Binary file detected (${filePath}). Cannot be read as text.`,
           },
         ],
         isError: true,
@@ -102,8 +102,8 @@ export async function readTool(args: ReadArgs): Promise<any> {
     const hasMore = endLine < lines.length;
     const parts: string[] = [];
     if (offset > 1) parts.push(`offset: ${offset}`);
-    if (hasMore) parts.push(`+${lines.length - endLine} linee rimanenti (totale ${lines.length})`);
-    if (truncated) parts.push(`troncato a ${MAX_TEXT_CHARS} caratteri`);
+    if (hasMore) parts.push(`+${lines.length - endLine} lines remaining (total ${lines.length})`);
+    if (truncated) parts.push(`truncated at ${MAX_TEXT_CHARS} characters`);
     const footer = parts.length > 0 ? `\n\n[${parts.join(", ")}]` : "";
 
     return {
@@ -114,7 +114,7 @@ export async function readTool(args: ReadArgs): Promise<any> {
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     return {
-      content: [{ type: "text", text: `Impossibile leggere il file: ${msg}` }],
+      content: [{ type: "text", text: `Unable to read file: ${msg}` }],
       isError: true,
     };
   }

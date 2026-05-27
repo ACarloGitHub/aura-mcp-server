@@ -9,8 +9,8 @@ interface ListDirArgs {
 }
 
 /**
- * Alias per filesystem-list-directory.
- * Elenca file e cartelle, scarta hidden.
+ * Alias for filesystem-list-directory.
+ * Lists files and directories, skips hidden entries.
  */
 export async function listDirTool(args: ListDirArgs): Promise<any> {
   const dirPath = resolveWorkspacePath(args.path || args.directory || args.folder || args.dir || ".");
@@ -23,8 +23,8 @@ export async function listDirTool(args: ListDirArgs): Promise<any> {
       if (e.name.startsWith(".")) continue;
       e.isDirectory() ? dirs.push(`${e.name}/`) : files.push(e.name);
     }
-    return textResult(`Directory: ${dirPath}\nTotale: ${entries.length}\n\n📁 Cartelle:\n${dirs.sort().join("\n") || "(nessuna)"}\n\n📄 File:\n${files.sort().join("\n") || "(nessun)"}`);
+    return textResult(`Directory: ${dirPath}\nTotal: ${entries.length}\n\n📁 Directories:\n${dirs.sort().join("\n") || "(none)"}\n\n📄 Files:\n${files.sort().join("\n") || "(none)"}`);
   } catch (error) {
-    return formatError(`Errore listing: ${(error as Error).message}`);
+    return formatError(`Listing error: ${(error as Error).message}`);
   }
 }

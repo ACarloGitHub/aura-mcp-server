@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Export sessioni LM Studio → Markdown + indicizzazione ChromaDB.
+Export LM Studio sessions → Markdown + ChromaDB indexing.
 
-Legge i file .conversation.json da ~/.lmstudio/conversations/
-estrae i messaggi, crea un .md per sessione, e indicizza in ChromaDB.
+Reads .conversation.json files from ~/.lmstudio/conversations/,
+extracts messages, creates a .md per session, and indexes into ChromaDB.
 
 Usage:
-    python3 session_export.py                    # export + indicizza tutte le sessioni
-    python3 session_export.py --export-only      # solo export markdown, senza indicizzare
-    python3 session_export.py --folder "Aura"   # solo una cartella
-    python3 session_export.py --reindex          # re-indicizza tutto da capo
+    python3 session_export.py                    # export + index all sessions
+    python3 session_export.py --export-only      # markdown export only, no indexing
+    python3 session_export.py --folder "Aura"    # specific folder only
+    python3 session_export.py --reindex          # re-index everything from scratch
 """
 
 import json
@@ -28,7 +28,7 @@ WORKSPACE = os.environ.get("AGENT_WORKSPACE", str(_project_root))
 # LM_STUDIO_CONVERSATIONS_DIR can be overridden via env var
 _default_conversations = os.path.join(os.path.expanduser("~"), ".lmstudio", "conversations")
 CONVERSATIONS_DIR = os.environ.get("LM_STUDIO_CONVERSATIONS_DIR", _default_conversations)
-EXPORT_DIR = os.path.join(WORKSPACE, "Sessioni")
+EXPORT_DIR = os.path.join(WORKSPACE, "Sessions")
 RAG_SCRIPT = os.path.join(_script_dir, "rag.py")
 
 
@@ -38,7 +38,7 @@ def parse_conversation(filepath: str) -> dict | None:
         with open(filepath, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, FileNotFoundError) as e:
-        print(f"  ERRORE lettura {filepath}: {e}", file=sys.stderr)
+        print(f"  ERROR reading {filepath}: {e}", file=sys.stderr)
         return None
 
     messages = []
@@ -161,8 +161,8 @@ def conversation_to_markdown(conv: dict) -> str:
     lines.append("")
     lines.append(f"# {conv['name']}")
     lines.append("")
-    lines.append(f"**Data:** {conv['created_at']}  ")
-    lines.append(f"**Modello:** {conv['model']}  ")
+    lines.append(f"**Date:** {conv['created_at']}  ")
+    lines.append(f"**Model:** {conv['model']}  ")
     if conv.get('preset'):
         lines.append(f"**Preset:** {conv['preset']}  ")
     lines.append(f"**Tokens:** {conv['token_count']}  ")
@@ -174,20 +174,20 @@ def conversation_to_markdown(conv: dict) -> str:
         lines.append(f"> {conv['system_prompt'][:500]}{'...' if len(conv['system_prompt']) > 500 else ''}")
         lines.append("")
     
-    lines.append("## Conversazione")
+    lines.append("## Conversation")
     lines.append("")
     
     for msg in conv["messages"]:
         role_label = {
-            "user": "**Utente**",
-            "assistant": "**Assistente**",
+            "user": "**User**",
+            "assistant": "**Assistant**",
             "system": "**System**"
         }.get(msg["role"], f"**{msg['role']}**")
         
         content = msg["content"]
         # Truncate very long messages
         if len(content) > 2000:
-            content = content[:2000] + "\n...[troncato]"
+            content = content[:2000] + "\n...[truncated]"
         
         lines.append(f"{role_label}:")
         lines.append("")
@@ -195,7 +195,7 @@ def conversation_to_markdown(conv: dict) -> str:
         lines.append("")
     
     lines.append("---")
-    lines.append(f"*Esportato il {datetime.now().strftime('%Y-%m-%d %H:%M')} da session_export.py*")
+    lines.append(f"*Exported on {datetime.now().strftime('%Y-%m-%d %H:%M')} by session_export.py*")
     
     return "\n".join(lines)
 
@@ -206,13 +206,13 @@ def find_conversations(folder: str | None = None) -> list[str]:
     base_dir = Path(CONVERSATIONS_DIR)
     
     if not base_dir.exists():
-        print(f"Directory conversazioni non trovata: {base_dir}", file=sys.stderr)
+        print(f"Conversations directory not found: {base_dir}", file=sys.stderr)
         return conversations
     
     if folder:
         search_dir = base_dir / folder
         if not search_dir.exists():
-            print(f"Cartella non trovata: {search_dir}", file=sys.stderr)
+            print(f"Folder not found: {search_dir}", file=sys.stderr)
             return conversations
         for f in search_dir.glob("*.conversation.json"):
             conversations.append(str(f))
@@ -275,14 +275,14 @@ def index_conversation(conv: dict, reindex: bool = False):
         role = msg["role"]
         content = msg["content"]
         if role == "user":
-            full_text_parts.append(f"Utente: {content}")
+            full_text_parts.append(f"User: {content}")
         elif role == "assistant":
-            full_text_parts.append(f"Assistente: {content}")
+            full_text_parts.append(f"Assistant: {content}")
     
     full_text = "\n\n".join(full_text_parts)
     
     if not full_text.strip():
-        print(f"  Saltato {conv['name']}: nessun contenuto testuale")
+        print(f"  Skipped {conv['name']}: no text content")
         return
     
     # Create metadata
@@ -331,29 +331,29 @@ def index_conversation(conv: dict, reindex: bool = False):
         ])
         os.unlink(tmp_path)
     
-    print(f"  Indicizzati {len(chunks)} chunk(s) per '{conv['name']}'")
+    print(f"  Indexed {len(chunks)} chunk(s) for '{conv['name']}'")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Export e indicizzazione sessioni LM Studio")
-    parser.add_argument("--export-only", action="store_true", help="Solo export markdown, senza indicizzare")
-    parser.add_argument("--folder", type=str, help="Solo una cartella specifica (es. 'Aura')")
-    parser.add_argument("--reindex", action="store_true", help="Re-indicizza tutto da capo")
+    parser = argparse.ArgumentParser(description="Export and index LM Studio sessions")
+    parser.add_argument("--export-only", action="store_true", help="Markdown export only, no indexing")
+    parser.add_argument("--folder", type=str, help="Only a specific folder (e.g. 'Aura')")
+    parser.add_argument("--reindex", action="store_true", help="Re-index everything from scratch")
     args = parser.parse_args()
     
     # Find conversations
     conversations = find_conversations(args.folder)
-    print(f"Trovate {len(conversations)} sessioni")
+    print(f"Found {len(conversations)} sessions")
     
     if not conversations:
-        print("Nessuna sessione trovata.")
+        print("No sessions found.")
         return
     
     # Ensure export directory exists
     os.makedirs(EXPORT_DIR, exist_ok=True)
     
     for conv_path in conversations:
-        print(f"\nProcessando: {conv_path}")
+        print(f"\nProcessing: {conv_path}")
         
         # Parse
         conv = parse_conversation(conv_path)
@@ -376,22 +376,22 @@ def main():
         with open(md_path, "w", encoding="utf-8") as f:
             f.write(md_content)
         
-        print(f"  Esportato: {md_path}")
+        print(f"  Exported: {md_path}")
         
         # Index into RAG (unless export-only)
         if not args.export_only:
             index_conversation(conv, reindex=args.reindex)
     
-    print(f"\n--- Completato ---")
-    print(f"Sessioni processate: {len(conversations)}")
-    print(f"Markdown esportati in: {EXPORT_DIR}/")
+    print(f"\n--- Completed ---")
+    print(f"Sessions processed: {len(conversations)}")
+    print(f"Markdown exported to: {EXPORT_DIR}/")
     
     if not args.export_only:
         result = run_rag_command(["collections"])
         if result:
-            print(f"Stato ChromaDB:")
+            print(f"ChromaDB status:")
             for col in result.get("collections", []):
-                print(f"  {col['name']}: {col['count']} documenti")
+                print(f"  {col['name']}: {col['count']} documents")
 
 
 if __name__ == "__main__":

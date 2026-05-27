@@ -4,7 +4,7 @@ import { fileURLToPath } from "url";
 import { getWorkspaceRoot, textResult, formatError } from "../utils/helpers.js";
 
 const WORKSPACE = getWorkspaceRoot();
-const SESSIONI_DIR = join(WORKSPACE, "SessioniAnythingllm");
+const SESSIONS_DIR = join(WORKSPACE, "AnythingLLMSessions");
 const API_BASE = process.env.ANYTHINGLLM_BASE_URL || "http://localhost:3001/api/v1";
 
 // Resolve the server root directory (where api-key.json should be placed)
@@ -12,7 +12,7 @@ const API_BASE = process.env.ANYTHINGLLM_BASE_URL || "http://localhost:3001/api/
 const _serverDir = dirname(dirname(fileURLToPath(import.meta.url)));
 
 async function getApiKey(argsKey?: string): Promise<string> {
-  // 1. Parametro diretto nel tool
+  // 1. Direct parameter in tool call
   if (argsKey) return argsKey;
 
   // 2. Env var
@@ -28,7 +28,11 @@ async function getApiKey(argsKey?: string): Promise<string> {
     try {
       const raw = await readFile(configPath, "utf-8");
       const parsed = JSON.parse(raw);
-      if (parsed.anythingllm_api_key && parsed.anythingllm_api_key !== "INSERISCI-QUI-LA-TUA-API-KEY") {
+      // Reject both legacy and new placeholder values
+      const placeholders = new Set([
+        "INSERT-YOUR-ANYTHINGLLM-API-KEY-HERE",
+      ]);
+      if (parsed.anythingllm_api_key && !placeholders.has(parsed.anythingllm_api_key)) {
         return parsed.anythingllm_api_key;
       }
     } catch {
@@ -37,8 +41,8 @@ async function getApiKey(argsKey?: string): Promise<string> {
   }
 
   throw new Error(
-    "API key AnythingLLM non trovata. " +
-    "Inseriscila in api-key.json (cartella del server) oppure imposta la variabile d'ambiente ANYTHINGLLM_API_KEY."
+    "AnythingLLM API key not found. " +
+    "Set it in api-key.json (server directory) or in the ANYTHINGLLM_API_KEY environment variable."
   );
 }
 
@@ -81,7 +85,7 @@ export async function anythingllmTool(args: AnythingLLMArgs): Promise<any> {
       case "export-all":
         return await exportAll(key);
       default:
-        throw new Error(`Azione anythingllm sconosciuta: ${args.action}`);
+        throw new Error(`Unknown anythingllm action: ${args.action}`);
     }
   } catch (error) {
     return formatError(error);
@@ -99,10 +103,10 @@ async function listWorkspaces(apiKey: string): Promise<any> {
   const workspaces = await withApiTimeout(fetchWorkspaces(apiKey), "listWorkspaces");
 
   if (workspaces.length === 0) {
-    return textResult("Nessun workspace trovato in AnythingLLM.");
+    return textResult("No workspaces found in AnythingLLM.");
   }
 
-  const lines: string[] = ["Workspace AnythingLLM disponibili:\n"];
+  const lines: string[] = ["Available AnythingLLM workspaces:\n"];
   for (const ws of workspaces) {
     lines.push(`  ${ws.name} (slug: ${ws.slug})`);
     if (ws.threads && ws.threads.length > 0) {
@@ -110,14 +114,14 @@ async function listWorkspaces(apiKey: string): Promise<any> {
         lines.push(`    - Thread: "${t.name}" (slug: ${t.slug})`);
       }
     } else {
-      lines.push(`    - Nessun thread`);
+      lines.push(`    - No threads`);
     }
     lines.push("");
   }
 
-  lines.push(`Totale: ${workspaces.length} workspace`);
-  lines.push(`\nPer esportare: action=export workspace="slug" [thread="slugthread"]`);
-  lines.push(`Per esportare tutto: action=export-all`);
+  lines.push(`Total: ${workspaces.length} workspace(s)`);
+  lines.push(`\nTo export: action=export workspace="slug" [thread="threadslug"]`);
+  lines.push(`To export all: action=export-all`);
 
   return textResult(lines.join("\n"));
 }
@@ -131,17 +135,17 @@ async function exportChats(apiKey: string, workspaceSlug?: string, threadSlug?: 
 
   if (messages.length === 0) {
     return textResult(
-      `Nessuna chat trovata per workspace "${workspaceSlug}"${threadSlug ? ` / thread "${threadSlug}"` : ""}.`
+      `No chats found for workspace "${workspaceSlug}"${threadSlug ? ` / thread "${threadSlug}"` : ""}.`
     );
   }
 
-  await mkdir(SESSIONI_DIR, { recursive: true });
+  await mkdir(SESSIONS_DIR, { recursive: true });
 
   const timestamp = new Date().toISOString().split("T")[0];
   const safeSlug = workspaceSlug.replace(/[^a-zA-Z0-9_-]/g, "_");
   const suffix = threadSlug ? `_thread_${threadSlug.replace(/[^a-zA-Z0-9_-]/g, "_")}` : "";
   const filename = `${timestamp}_AnythingLLM_${safeSlug}${suffix}.md`;
-  const filepath = join(SESSIONI_DIR, filename);
+  const filepath = join(SESSIONS_DIR, filename);
 
   let md = `---\n`;
   md += `title: "AnythingLLM - ${workspaceSlug}"\n`;
@@ -154,32 +158,32 @@ async function exportChats(apiKey: string, workspaceSlug?: string, threadSlug?: 
   md += `---\n\n`;
   md += `# AnythingLLM — ${workspaceSlug}\n`;
   if (threadSlug) md += `\nThread: ${threadSlug}\n`;
-  md += `\nEsportato il ${new Date().toLocaleDateString("en-US")}\n`;
+  md += `\nExported on ${new Date().toLocaleDateString("en-US")}\n`;
   md += `Messaggi: ${messages.length}\n\n`;
   md += `---\n\n`;
 
   for (const msg of messages) {
-    const dateStr = msg.sentAt ? new Date(msg.sentAt * 1000).toLocaleString("en-US") : "data sconosciuta";
-    const role = msg.role === "user" ? "Utente" : "Assistente";
+    const dateStr = msg.sentAt ? new Date(msg.sentAt * 1000).toLocaleString("en-US") : "unknown date";
+    const role = msg.role === "user" ? "User" : "Assistant";
     md += `### ${role} — ${dateStr}\n\n`;
     md += `${msg.content}\n\n`;
 
     if (msg.metrics?.model) {
-      md += `> Modello: ${msg.metrics.model} | Provider: ${msg.metrics.provider || "sconosciuto"}\n\n`;
+      md += `> Modello: ${msg.metrics.model} | Provider: ${msg.metrics.provider || "unknown"}\n\n`;
     }
   }
 
-  md += `---\n\n_Esportato via AnythingLLM API_`;
+  md += `---\n\n_Exported via AnythingLLM API_`;
 
   await writeFile(filepath, md, "utf-8");
 
   return textResult(
-    `Esportazione completata!\n\n- Workspace: ${workspaceSlug}${threadSlug ? ` / Thread: ${threadSlug}` : ""}\n- Messaggi: ${messages.length}\n- Salvato in: SessioniAnythingllm/${filename}`
+    `Export completed!\n\n- Workspace: ${workspaceSlug}${threadSlug ? ` / Thread: ${threadSlug}` : ""}\n- Messages: ${messages.length}\n- Saved in: AnythingLLMSessions/${filename}`
   );
 }
 
 async function exportAll(apiKey: string): Promise<any> {
-  await mkdir(SESSIONI_DIR, { recursive: true });
+  await mkdir(SESSIONS_DIR, { recursive: true });
 
   const workspaces = await withApiTimeout(fetchWorkspaces(apiKey), "exportAll");
   const results: string[] = [];
@@ -190,10 +194,10 @@ async function exportAll(apiKey: string): Promise<any> {
       const timestamp = new Date().toISOString().split("T")[0];
       const safeSlug = ws.slug.replace(/[^a-zA-Z0-9_-]/g, "_");
       const filename = `${timestamp}_AnythingLLM_${safeSlug}.md`;
-      const filepath = join(SESSIONI_DIR, filename);
+      const filepath = join(SESSIONS_DIR, filename);
 
       let md = buildFrontmatter(ws.slug, mainMessages.length);
-      md += `# AnythingLLM — ${ws.name}\n\nChat principale del workspace.\n\n`;
+      md += `# AnythingLLM — ${ws.name}\n\nMain workspace chat.\n\n`;
       md += buildChatBody(mainMessages);
 
       await writeFile(filepath, md, "utf-8");
@@ -208,7 +212,7 @@ async function exportAll(apiKey: string): Promise<any> {
           const safeSlug = ws.slug.replace(/[^a-zA-Z0-9_-]/g, "_");
           const safeThread = t.slug.replace(/[^a-zA-Z0-9_-]/g, "_");
           const filename = `${timestamp}_AnythingLLM_${safeSlug}_${safeThread}.md`;
-          const filepath = join(SESSIONI_DIR, filename);
+          const filepath = join(SESSIONS_DIR, filename);
 
           let md = buildFrontmatter(ws.slug, threadMessages.length, t.slug);
           md += `# AnythingLLM — ${ws.name}\n\nThread: ${t.name}\n\n`;
@@ -221,10 +225,10 @@ async function exportAll(apiKey: string): Promise<any> {
     }
   }
 
-  if (results.length === 0) return textResult("Nessuna chat da esportare.");
+  if (results.length === 0) return textResult("No chats to export.");
 
   return textResult(
-    `Esportazione completa!\n\n${results.join("\n")}\n\nTotale: ${results.length} file salvati in SessioniAnythingllm/`
+    `Export complete!\n\n${results.join("\n")}\n\nTotal: ${results.length} files saved in AnythingLLMSessions/`
   );
 }
 
@@ -253,7 +257,7 @@ async function fetchChats(apiKey: string, workspaceSlug: string, threadSlug?: st
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`API error (${res.status}) per ${url}: ${err}`);
+    throw new Error(`API error (${res.status}) for ${url}: ${err}`);
   }
 
   const data = (await res.json()) as any;

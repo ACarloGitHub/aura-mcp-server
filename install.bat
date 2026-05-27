@@ -1,118 +1,118 @@
 @echo off
 setlocal EnableDelayedExpansion
-REM install.bat — Setup automatico server MCP su Windows
-REM Uso: fai doppio click o esegui da cmd nella cartella mcp-server/
+REM install.bat — Automatic MCP server setup on Windows
+REM Usage: double-click or run from cmd in the mcp-server/ folder
 
 echo =========================================
-echo  Aura MCP Server — Installazione
+echo  Aura MCP Server — Installation
 echo =========================================
 echo.
 
 REM Verifica Node.js
 node --version > nul 2>&1
 if errorlevel 1 (
-    echo [ERRORE] Node.js non trovato.
-    echo Scaricalo da https://nodejs.org/ consigliato LTS
-echo.
+    echo [ERROR] Node.js not found.
+    echo Download from https://nodejs.org/ (LTS recommended)
+    echo.
     pause
     exit /b 1
 )
 for /f "tokens=*" %%a in ('node --version') do set NODE_VER=%%a
-echo [OK] Node.js trovato: %NODE_VER%
+echo [OK] Node.js found: %NODE_VER%
 
 REM Verifica npm
 npm --version > nul 2>&1
 if errorlevel 1 (
-    echo [ERRORE] npm non trovato.
+    echo [ERROR] npm not found.
     pause
     exit /b 1
 )
 for /f "tokens=*" %%a in ('npm --version') do set NPM_VER=%%a
-echo [OK] npm trovato: %NPM_VER%
+echo [OK] npm found: %NPM_VER%
 
 echo.
-echo [INFO] Verifica Python...
+echo [INFO] Checking Python...
 echo.
 python --version > nul 2>&1
 if errorlevel 1 (
-    echo [WARN] Python non trovato nel PATH.
-    echo RAG, session_export e il tool anythingllm con funzionalita avanzate
-    echo richiedono Python con chromadb. Puoi saltarlo ora e configurarlo dopo.
+    echo [WARN] Python not found in PATH.
+    echo RAG, session_export and the anythingllm tool with advanced features
+    echo require Python with chromadb. You can skip this now and configure it later.
     pause
 ) else (
-    echo [OK] Python trovato.
+    echo [OK] Python found.
     echo.
-    echo [INFO] Verifica chromadb in Python globale...
+    echo [INFO] Checking chromadb in global Python...
     python -c "import chromadb" > nul 2>&1
     if errorlevel 1 (
-        echo [WARN] chromadb non trovato in Python globale.
+        echo [WARN] chromadb not found in global Python.
         echo.
-        choice /C YN /M "Vuoi creare un venv dedicato con chromadb"
+        choice /C YN /M "Create a dedicated venv with chromadb"
         if errorlevel 2 (
-            echo [INFO] Venv non creato. RAG non funzionera finche non installi chromadb.
-            echo Puoi farlo dopo con: pip install chromadb
+            echo [INFO] Venv not created. RAG will not work until you install chromadb.
+            echo You can do this later with: pip install chromadb
         ) else (
-            echo [INFO] Creazione venv .venv...
+            echo [INFO] Creating .venv...
             python -m venv .venv
             if errorlevel 1 (
-                echo [ERRORE] Creazione venv fallita.
+                echo [ERROR] Venv creation failed.
                 pause
                 exit /b 1
             )
-            echo [OK] Venv creato. Installazione chromadb...
+            echo [OK] Venv created. Installing chromadb...
             .venv\Scripts\pip install chromadb
             if errorlevel 1 (
-                echo [ERRORE] Installazione chromadb fallita.
+                echo [ERROR] chromadb installation failed.
                 pause
                 exit /b 1
             )
-            echo [OK] chromadb installato nel venv.
+            echo [OK] chromadb installed in venv.
         )
     ) else (
-        echo [OK] chromadb disponibile in Python globale.
+        echo [OK] chromadb available in global Python.
     )
 )
 
-REM Installa dipendenze npm
+REM Install npm dependencies
 echo.
-echo [INFO] Installazione dipendenze npm...
+echo [INFO] Installing npm dependencies...
 npm install
 if errorlevel 1 (
-    echo [ERRORE] npm install fallito.
+    echo [ERROR] npm install failed.
     pause
     exit /b 1
 )
-echo [OK] Dipendenze installate.
+echo [OK] Dependencies installed.
 
 REM Build TypeScript
 echo.
-echo [INFO] Compilazione TypeScript...
+echo [INFO] Compiling TypeScript...
 npm run build
 if errorlevel 1 (
-    echo [ERRORE] Build fallita.
-    echo Assicurati di avere TypeScript installato: npm install -g typescript
+    echo [ERROR] Build failed.
+    echo Make sure TypeScript is installed: npm install -g typescript
     pause
     exit /b 1
 )
-echo [OK] Build completata.
+echo [OK] Build completed.
 
-REM Crea cartella log se non esiste
+REM Create logs directory if it doesn't exist
 if not exist logs mkdir logs
 
 echo.
 echo =========================================
-echo  Installazione completata!
+echo  Installation completed!
 echo =========================================
 echo.
 echo Workspace: %AGENT_WORKSPACE%
 echo.
-echo Per avviare il server in normale:
+echo To start the server normally:
 echo   start.bat
 echo.
-echo Per avviare in modalita debug (con log su file):
+echo To start in debug mode (with file logging):
 echo   debug-server.bat
 echo.
-echo Ricorda: imposta AGENT_WORKSPACE=percorso-assoluto-del-workspace
-echo nelle variabili di ambiente di AnythingLLM se non usi start.bat
+echo Remember: set AGENT_WORKSPACE=absolute-path-to-workspace
+echo in AnythingLLM environment variables if not using start.bat
 echo.
 pause

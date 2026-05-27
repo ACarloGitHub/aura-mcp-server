@@ -1,5 +1,5 @@
-// webSearch.ts — Ricerca web via DuckDuckGo (lite POST) e Brave API
-// DuckDuckGo blocca spesso richieste bot; usiamo /lite/ con POST + headers browser
+// webSearch.ts — Web search via DuckDuckGo (lite POST) and Brave API
+// DuckDuckGo often blocks bot requests; we use /lite/ with POST + browser headers
 
 interface WebSearchArgs {
   query: string;
@@ -16,7 +16,7 @@ interface SearchResult {
 const SEARCH_TIMEOUT_MS = 30_000;
 const MAX_RESULTS = 10;
 
-// Headers desktop moderno — obbligatorio per non triggerare CAPTCHA DDG
+// Modern desktop headers — required to avoid DDG CAPTCHA
 const DDG_HEADERS = {
   "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
   "Accept": "text/html",
@@ -48,7 +48,7 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): P
     return await Promise.race([promise, timeout]);
   } catch (err) {
     return {
-      content: [{ type: "text", text: `Errore: ${err instanceof Error ? err.message : String(err)}` }],
+      content: [{ type: "text", text: `Error: ${err instanceof Error ? err.message : String(err)}` }],
       isError: true,
     };
   }
@@ -73,7 +73,7 @@ async function searchDuckDuckGoLite(query: string, count: number): Promise<any> 
   // Se compare CAPTCHA/anomaly, blocca subito
   if (html.includes("bots use DuckDuckGo") || html.includes("anomaly-modal")) {
     return {
-      content: [{ type: "text", text: "Errore: DuckDuckGo ha richiesto una verifica anti-bot (CAPTCHA). Riprova tra qualche minuto." }],
+      content: [{ type: "text", text: "Error: DuckDuckGo requested an anti-bot verification (CAPTCHA). Try again in a few minutes." }],
       isError: true,
     };
   }
@@ -82,7 +82,7 @@ async function searchDuckDuckGoLite(query: string, count: number): Promise<any> 
 
   if (results.length === 0) {
     return {
-      content: [{ type: "text", text: `Nessun risultato trovato per "${query}".` }],
+      content: [{ type: "text", text: `No results found for "${query}".` }],
     };
   }
 
@@ -92,8 +92,8 @@ async function searchDuckDuckGoLite(query: string, count: number): Promise<any> 
 function parseDuckDuckGoLiteHTML(html: string, maxResults: number): SearchResult[] {
   const results: SearchResult[] = [];
 
-  // DDG lite: ogni risultato = un blocco <tr> con <a class='result-link'> e <td class='result-snippet'>
-  // Estrazione piu' robusta con split su marker
+  // DDG lite: each result = a <tr> block
+  // More robust extraction using split on markers
   const rows = html.split(/<tr\b[^>]*>/i);
 
   for (const row of rows) {
@@ -106,7 +106,7 @@ function parseDuckDuckGoLiteHTML(html: string, maxResults: number): SearchResult
     const title = stripHtml(linkMatch[2]);
 
     const snippetMatch = row.match(/<td\s+class='result-snippet'[^>]*>(.*?)<\/td>/is);
-    const description = snippetMatch ? stripHtml(snippetMatch[1]) : "Nessuna descrizione";
+    const description = snippetMatch ? stripHtml(snippetMatch[1]) : "No description";
 
     results.push({ title, url, description });
   }
@@ -114,7 +114,7 @@ function parseDuckDuckGoLiteHTML(html: string, maxResults: number): SearchResult
   return results;
 }
 
-// ============== Brave (API key richiesta) ==============
+// ============== Brave (API key required) ==============
 async function searchBrave(query: string, count: number, apiKey: string): Promise<any> {
   const url = new URL("https://api.search.brave.com/res/v1/web/search");
   url.searchParams.append("q", query);
@@ -135,7 +135,7 @@ async function searchBrave(query: string, count: number, apiKey: string): Promis
 
   const data = await response.json();
   const results: SearchResult[] = (data.web?.results || []).map((r: any) => ({
-    title: r.title || "Senza titolo",
+    title: r.title || "Untitled",
     url: r.url || "",
     description: r.description || "",
   }));
@@ -158,7 +158,7 @@ function stripHtml(html: string): string {
 function formatResults(query: string, results: SearchResult[], source: string): any {
   if (results.length === 0) {
     return {
-      content: [{ type: "text", text: `Nessun risultato trovato per "${query}" su ${source}.` }],
+      content: [{ type: "text", text: `No results found for "${query}" on ${source}.` }],
     };
   }
 
@@ -167,6 +167,6 @@ function formatResults(query: string, results: SearchResult[], source: string): 
     .join("\n\n");
 
   return {
-    content: [{ type: "text", text: `Risultati per: "${query}" (via ${source}, ${results.length} risultati)\n\n${formatted}` }],
+    content: [{ type: "text", text: `Results for: "${query}" (via ${source}, ${results.length} results)\n\n${formatted}` }],
   };
 }

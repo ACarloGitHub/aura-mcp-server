@@ -52,7 +52,7 @@ export async function ragTool(args: RagArgs): Promise<any> {
       case "ingest_sessions":
         return await ragIngestSessions(args);
       default:
-        throw new Error(`Azione RAG sconosciuta: ${args.action}`);
+        throw new Error(`Unknown RAG action: ${args.action}`);
     }
   } catch (error) {
     return formatError(error);
@@ -68,7 +68,7 @@ async function runRag(command: string, args: string[]): Promise<string> {
     windowsHide: true,
   });
 
-  if (stderr && stderr.includes("Errore")) {
+  if (stderr && stderr.includes("Error")) {
     throw new Error(`RAG stderr: ${stderr}`);
   }
 
@@ -77,7 +77,7 @@ async function runRag(command: string, args: string[]): Promise<string> {
 
 async function ragSearch(args: RagArgs): Promise<any> {
   if (!args.collection || !args.query) {
-    throw new Error("Parametri richiesti: collection e query per la ricerca");
+    throw new Error("Required parameters: collection and query for search");
   }
 
   const cmdArgs = [
@@ -91,17 +91,17 @@ async function ragSearch(args: RagArgs): Promise<any> {
   const parsed = JSON.parse(result);
 
   const formatted = parsed.results?.map((r: any, i: number) => {
-    const distance = r.distance !== null ? ` (distanza: ${r.distance.toFixed(3)})` : "";
+    const distance = r.distance !== null ? ` (distance: ${r.distance.toFixed(3)})` : "";
     const meta = r.metadata ? ` [${Object.entries(r.metadata).map(([k, v]) => `${k}=${v}`).join(", ")}]` : "";
     return `${i + 1}. ${r.text?.substring(0, 300)}${r.text?.length > 300 ? "..." : ""}${distance}${meta}`;
-  }).join("\n\n") || "Nessun risultato trovato.";
+  }).join("\n\n") || "No results found.";
 
-  return textResult(`🔍 Ricerca RAG "${args.query}" in "${args.collection}" (${parsed.results?.length || 0} risultati):\n\n${formatted}`);
+  return textResult(`🔍 RAG search "${args.query}" in "${args.collection}" (${parsed.results?.length || 0} results):\n\n${formatted}`);
 }
 
 async function ragAdd(args: RagArgs): Promise<any> {
   if (!args.collection || !args.id || !args.text) {
-    throw new Error("Parametri richiesti: collection, id e text per aggiungere");
+    throw new Error("Required parameters: collection, id and text to add");
   }
 
   const cmdArgs = ["--collection", args.collection, "--id", args.id, "--text", args.text];
@@ -110,11 +110,11 @@ async function ragAdd(args: RagArgs): Promise<any> {
   const result = await runRag("add", cmdArgs);
   const parsed = JSON.parse(result);
 
-  return textResult(`✅ Aggiunto a "${parsed.collection}": id=${parsed.id} (totale: ${parsed.chunks} documenti)`);
+  return textResult(`✅ Added to "${parsed.collection}": id=${parsed.id} (total: ${parsed.chunks} documents)`);
 }
 
 async function ragList(args: RagArgs): Promise<any> {
-  if (!args.collection) throw new Error("Parametro richiesto: collection");
+  if (!args.collection) throw new Error("Required parameter: collection");
 
   const cmdArgs = ["--collection", args.collection, "--limit", String(args.limit || 50)];
   const result = await runRag("list", cmdArgs);
@@ -123,25 +123,25 @@ async function ragList(args: RagArgs): Promise<any> {
   const formatted = parsed.documents?.map((d: any, i: number) => {
     const meta = d.metadata ? ` [${Object.entries(d.metadata).map(([k, v]) => `${k}=${v}`).join(", ")}]` : "";
     return `${i + 1}. ${d.id}${meta}`;
-  }).join("\n") || "Collection vuota.";
+  }).join("\n") || "Empty collection.";
 
-  return textResult(`📚 Collection "${parsed.collection}" (${parsed.count} documenti):\n\n${formatted}`);
+  return textResult(`📚 Collection "${parsed.collection}" (${parsed.count} documents):\n\n${formatted}`);
 }
 
 async function ragDelete(args: RagArgs): Promise<any> {
-  if (!args.collection || !args.id) throw new Error("Parametri richiesti: collection e id per eliminare");
+  if (!args.collection || !args.id) throw new Error("Required parameters: collection and id to delete");
 
   const result = await runRag("delete", ["--collection", args.collection, "--id", args.id]);
   const parsed = JSON.parse(result);
 
-  return textResult(`🗑️ Eliminato da "${parsed.collection}": ${parsed.id}`);
+  return textResult(`🗑️ Deleted from "${parsed.collection}": ${parsed.id}`);
 }
 
 async function ragCollections(): Promise<any> {
   const result = await runRag("collections", []);
   const parsed = JSON.parse(result);
 
-  const formatted = parsed.collections?.map((c: any) => `• ${c.name} (${c.count} documenti)`).join("\n") || "Nessuna collection.";
+  const formatted = parsed.collections?.map((c: any) => `• ${c.name} (${c.count} documents)`).join("\n") || "No collections.";
 
   return textResult(`📊 Collections ChromaDB:\n\n${formatted}`);
 }
@@ -158,5 +158,5 @@ async function ragIngestSessions(args: RagArgs): Promise<any> {
     windowsHide: true,
   });
 
-  return textResult(`📦 Sessioni importate nel RAG:\n\n${stdout}${stderr ? `\nStderr: ${stderr}` : ""}`);
+  return textResult(`📦 Sessions indexed into RAG:\n\n${stdout}${stderr ? `\nStderr: ${stderr}` : ""}`);
 }

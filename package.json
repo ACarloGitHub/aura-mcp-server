@@ -1,7 +1,7 @@
 {
   "name": "aura-mcp-server",
-  "version": "2.0.0",
-  "description": "Cross-platform MCP server for AnythingLLM / LM Studio — tools for file system, shell, wiki, RAG, planner, web search and AnythingLLM integration",
+  "version": "2.1.0",
+  "description": "Cross-platform MCP server for AnythingLLM / LM Studio — file system, shell, wiki, RAG, planner, web search and AnythingLLM integration tools.",
   "main": "dist/index.js",
   "type": "module",
   "engines": {
@@ -16,6 +16,7 @@
   },
   "keywords": [
     "mcp",
+    "model-context-protocol",
     "lm-studio",
     "anythingllm",
     "tools",
@@ -26,8 +27,16 @@
     "wiki",
     "planner"
   ],
-  "author": "",
+  "author": "ACarloGitHub",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ACarloGitHub/aura-mcp-server.git"
+  },
+  "homepage": "https://github.com/ACarloGitHub/aura-mcp-server#readme",
+  "bugs": {
+    "url": "https://github.com/ACarloGitHub/aura-mcp-server/issues"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4"
   },

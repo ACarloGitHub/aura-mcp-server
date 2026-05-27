@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-RAG Engine — backend Python per ChromaDB + embeddings via Ollama (nomic-embed-text).
-Nessuna dipendenza da llama-cpp-python. Usa l'API Ollama locale per le embeddings.
-Chiamato dai tool MCP del server TypeScript.
+RAG Engine — Python backend for ChromaDB + embeddings via Ollama (nomic-embed-text).
+No dependency on llama-cpp-python. Uses the local Ollama API for embeddings.
+Called by the MCP server TypeScript tools.
 
 Usage:
-    python3 rag.py add --collection sessions --id "session-123" --text "contenuto..." --metadata '{"source":"lm-studio","date":"2026-04-24"}'
-    python3 rag.py search --collection sessions --query "come configuro GPU" --limit 5
+    python3 rag.py add --collection sessions --id "session-123" --text "content..." --metadata '{"source":"lm-studio","date":"2026-04-24"}'
+    python3 rag.py search --collection sessions --query "how to configure GPU" --limit 5
     python3 rag.py list --collection sessions
     python3 rag.py delete --collection sessions --id "session-123"
     python3 rag.py collections
@@ -37,11 +37,11 @@ OLLAMA_MODEL = os.environ.get("OLLAMA_EMBED_MODEL", "nomic-embed-text")
 
 
 def get_embeddings(texts):
-    """Genera embeddings usando l'API Ollama locale."""
+    """Generate embeddings using the local Ollama API."""
     results = []
     for text in texts:
         if not text or not text.strip():
-            text = "(vuoto)"
+            text = "(empty)"
         payload = json.dumps({
             "model": OLLAMA_MODEL,
             "prompt": f"search_document: {text[:2000]}"
@@ -56,9 +56,9 @@ def get_embeddings(texts):
                 data = json.loads(resp.read().decode("utf-8"))
             results.append(data["embedding"])
         except urllib.error.URLError as e:
-            raise RuntimeError(f"Errore connessione Ollama ({OLLAMA_EMBED_URL}): {e}")
+            raise RuntimeError(f"Ollama connection error ({OLLAMA_EMBED_URL}): {e}")
         except KeyError:
-            raise RuntimeError(f"Risposta Ollama senza campo 'embedding': {data}")
+            raise RuntimeError(f"Ollama response missing 'embedding' field: {data}")
     return results
 
 

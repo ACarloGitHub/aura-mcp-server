@@ -39,7 +39,7 @@ export async function execTool(args: ExecArgs): Promise<any> {
       mkdirSync(bgDir, { recursive: true });
     } catch {
       return {
-        content: [{ type: "text", text: `Errore: impossibile creare directory bg-jobs in ${bgDir}` }],
+        content: [{ type: "text", text: `Error: unable to create bg-jobs directory in ${bgDir}` }],
         isError: true,
       };
     }
@@ -76,7 +76,7 @@ export async function execTool(args: ExecArgs): Promise<any> {
     child.on("error", (err) => { jobData.running = false; jobData.exitCode = -1; jobData.stderr += `\n[Error: ${err.message}]`; saveJob(); });
 
     return {
-      content: [{ type: "text", text: `Comando avviato in background (sessionId: ${sessionId}, pid: ${child.pid || "N/A"})` }],
+      content: [{ type: "text", text: `Command started in background (sessionId: ${sessionId}, pid: ${child.pid || "N/A"})` }],
     };
   }
 
@@ -123,14 +123,14 @@ export async function execTool(args: ExecArgs): Promise<any> {
       clearTimeout(timeoutId);
       if (timedOut) {
         resolve({
-          content: [{ type: "text", text: `Timeout dopo ${clampedTimeout}s\n\nStdout:\n${truncate(stdout)}\n\nStderr:\n${truncate(stderr)}` }],
+          content: [{ type: "text", text: `Timeout after ${clampedTimeout}s\n\nStdout:\n${truncate(stdout)}\n\nStderr:\n${truncate(stderr)}` }],
           isError: true,
         });
         return;
       }
       if (killed) {
         resolve({
-          content: [{ type: "text", text: `Output eccessivo (max ${MAX_OUTPUT_CHARS} chars).\n\nStdout:\n${truncate(stdout)}\n\nStderr:\n${truncate(stderr)}` }],
+          content: [{ type: "text", text: `Excessive output (max ${MAX_OUTPUT_CHARS} chars).\n\nStdout:\n${truncate(stdout)}\n\nStderr:\n${truncate(stderr)}` }],
           isError: true,
         });
         return;
@@ -138,13 +138,13 @@ export async function execTool(args: ExecArgs): Promise<any> {
       const output: any[] = [];
       if (stdout) output.push({ type: "text", text: truncate(stdout) });
       if (stderr) output.push({ type: "text", text: `Stderr:\n${truncate(stderr)}` });
-      if (output.length === 0) output.push({ type: "text", text: `Completato (exit: ${code}, signal: ${signal || "none"})` });
+      if (output.length === 0) output.push({ type: "text", text: `Completed (exit: ${code}, signal: ${signal || "none"})` });
       resolve({ content: output, isError: code !== 0 && code !== null });
     });
 
     child.on("error", (error) => {
       clearTimeout(timeoutId);
-      resolve({ content: [{ type: "text", text: `Errore: ${error.message}` }], isError: true });
+      resolve({ content: [{ type: "text", text: `Error: ${error.message}` }], isError: true });
     });
   });
 }
@@ -155,17 +155,17 @@ export async function execPollTool(args: { jobId: string; tail?: number }): Prom
   const tail = args.tail || 100;
   let raw: string;
   try { raw = readFileSync(jobFile, "utf-8"); } catch {
-    return { content: [{ type: "text", text: `Job non trovato: ${args.jobId}` }], isError: true };
+    return { content: [{ type: "text", text: `Job not found: ${args.jobId}` }], isError: true };
   }
   let job: any;
   try { job = JSON.parse(raw); } catch {
-    return { content: [{ type: "text", text: `File job corrotto: ${args.jobId}` }], isError: true };
+    return { content: [{ type: "text", text: `Corrupted job file: ${args.jobId}` }], isError: true };
   }
-  const tailStdout = job.stdout ? (job.stdout as string).split("\n").slice(-tail).join("\n") : "(vuoto)";
-  const tailStderr = job.stderr ? (job.stderr as string).split("\n").slice(-tail).join("\n") : "(vuoto)";
-  const status = job.running ? "[ANCORA IN ESECUZIONE]" : `[COMPLETATO] exitCode: ${job.exitCode}`;
+  const tailStdout = job.stdout ? (job.stdout as string).split("\n").slice(-tail).join("\n") : "(empty)";
+  const tailStderr = job.stderr ? (job.stderr as string).split("\n").slice(-tail).join("\n") : "(empty)";
+  const status = job.running ? "[STILL RUNNING]" : `[COMPLETED] exitCode: ${job.exitCode}`;
   return {
-    content: [{ type: "text", text: `${status}\npid: ${job.pid}\ncommand: ${job.command}\nstartedAt: ${job.startedAt}\n\n--- Stdout (ultime ${tail} righe) ---\n${tailStdout}\n\n--- Stderr (ultime ${tail} righe) ---\n${tailStderr}` }],
+    content: [{ type: "text", text: `${status}\npid: ${job.pid}\ncommand: ${job.command}\nstartedAt: ${job.startedAt}\n\n--- Stdout (last ${tail} lines) ---\n${tailStdout}\n\n--- Stderr (last ${tail} lines) ---\n${tailStderr}` }],
   };
 }
 
@@ -174,21 +174,21 @@ export async function execKillTool(args: { jobId: string }): Promise<any> {
   const jobFile = join(bgDir, `${args.jobId}.json`);
   let raw: string;
   try { raw = readFileSync(jobFile, "utf-8"); } catch {
-    return { content: [{ type: "text", text: `Job non trovato: ${args.jobId}` }], isError: true };
+    return { content: [{ type: "text", text: `Job not found: ${args.jobId}` }], isError: true };
   }
   let job: any;
   try { job = JSON.parse(raw); } catch {
-    return { content: [{ type: "text", text: `File job corrotto: ${args.jobId}` }], isError: true };
+    return { content: [{ type: "text", text: `Corrupted job file: ${args.jobId}` }], isError: true };
   }
   if (!job.running) {
-    return { content: [{ type: "text", text: `Job ${args.jobId} gia terminato (exitCode: ${job.exitCode})` }] };
+    return { content: [{ type: "text", text: `Job ${args.jobId} already terminated (exitCode: ${job.exitCode})` }] };
   }
   try { process.kill(job.pid, "SIGTERM"); } catch {
     try { process.kill(job.pid); } catch (e) {
-      return { content: [{ type: "text", text: `Impossibile killare pid ${job.pid}: ${String(e)}` }], isError: true };
+      return { content: [{ type: "text", text: `Unable to kill pid ${job.pid}: ${String(e)}` }], isError: true };
     }
   }
-  return { content: [{ type: "text", text: `SIGTERM inviato a pid ${job.pid} (job: ${args.jobId})` }] };
+  return { content: [{ type: "text", text: `SIGTERM sent to pid ${job.pid} (job: ${args.jobId})` }] };
 }
 
 export async function execListTool(): Promise<any> {
@@ -197,10 +197,10 @@ export async function execListTool(): Promise<any> {
   try {
     entries = (readdirSync(bgDir) as string[]).filter((f) => f.endsWith(".json"));
   } catch {
-    return { content: [{ type: "text", text: "Nessun job trovato (bg-jobs/ vuota o inesistente)." }] };
+    return { content: [{ type: "text", text: "No jobs found (bg-jobs/ empty or missing)." }] };
   }
   if (entries.length === 0) {
-    return { content: [{ type: "text", text: "Nessun job trovato." }] };
+    return { content: [{ type: "text", text: "No jobs found." }] };
   }
   const rows = entries.map((f) => {
     const jobId = f.replace(".json", "");
@@ -210,10 +210,10 @@ export async function execListTool(): Promise<any> {
       const age = Math.round((Date.now() - new Date(job.startedAt).getTime()) / 1000);
       return `${jobId}  ${status}  ${age}s fa  cmd: ${String(job.command).substring(0, 60)}`;
     } catch {
-      return `${jobId}  [file corrotto]`;
+      return `${jobId}  [corrupted file]`;
     }
   });
-  return { content: [{ type: "text", text: `Job background:\n\n${rows.join("\n")}` }] };
+  return { content: [{ type: "text", text: `Background jobs:\n\n${rows.join("\n")}` }] };
 }
 
 export async function execCleanTool(args: { maxAgeHours?: number; all?: boolean }): Promise<any> {
@@ -224,7 +224,7 @@ export async function execCleanTool(args: { maxAgeHours?: number; all?: boolean 
   try {
     entries = (readdirSync(bgDir) as string[]).filter((f) => f.endsWith(".json"));
   } catch {
-    return { content: [{ type: "text", text: "Nessun job da pulire." }] };
+    return { content: [{ type: "text", text: "No jobs to clean." }] };
   }
   const deleted: string[] = [];
   const skipped: string[] = [];
@@ -243,13 +243,13 @@ export async function execCleanTool(args: { maxAgeHours?: number; all?: boolean 
       try { unlinkSync(filePath); deleted.push(f.replace(".json", "")); } catch { /* ignore */ }
     }
   }
-  const lines = [`Eliminati: ${deleted.length} job.`];
+  const lines = [`Deleted: ${deleted.length} job(s).`];
   if (deleted.length > 0) lines.push(deleted.map((id) => `  - ${id}`).join("\n"));
-  if (skipped.length > 0) lines.push(`Saltati (running o recenti): ${skipped.length}`);
+  if (skipped.length > 0) lines.push(`Skipped (running or recent): ${skipped.length}`);
   return { content: [{ type: "text", text: lines.join("\n") }] };
 }
 
 function truncate(text: string): string {
   if (text.length <= MAX_OUTPUT_CHARS) return text;
-  return text.substring(0, MAX_OUTPUT_CHARS) + `\n\n[...troncato: ${text.length} chars totali]`;
+  return text.substring(0, MAX_OUTPUT_CHARS) + `\n\n[...truncated: ${text.length} chars total]`;
 }

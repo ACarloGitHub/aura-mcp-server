@@ -9,7 +9,7 @@
 
 ```bash
 # Clone or copy the project
-cd lm-studio-agent-server
+cd aura-mcp-server
 npm install
 npm run build
 ```
@@ -32,9 +32,9 @@ Add to `~/.lmstudio/mcp.json` (Linux/macOS) or `%USERPROFILE%\.lmstudio\mcp.json
   "mcpServers": {
     "agent-server": {
       "command": "node",
-      "args": ["/path/to/lm-studio-agent-server/dist/index.js"],
+      "args": ["/path/to/aura-mcp-server/dist/index.js"],
       "env": {
-        "AGENT_WORKSPACE": "/path/to/lm-studio-agent-server"
+        "AGENT_WORKSPACE": "/path/to/aura-mcp-server"
       }
     }
   }
@@ -47,9 +47,9 @@ Add to `~/.lmstudio/mcp.json` (Linux/macOS) or `%USERPROFILE%\.lmstudio\mcp.json
   "mcpServers": {
     "agent-server": {
       "command": "C:\\Program Files\\nodejs\\node.exe",
-      "args": ["C:\\Users\\YourName\\lm-studio-agent-server\\dist\\index.js"],
+      "args": ["C:\\Users\\YourName\\aura-mcp-server\\dist\\index.js"],
       "env": {
-        "AGENT_WORKSPACE": "C:\\Users\\YourName\\lm-studio-agent-server"
+        "AGENT_WORKSPACE": "C:\\Users\\YourName\\aura-mcp-server"
       }
     }
   }
@@ -63,7 +63,7 @@ When LM Studio loads the agent, the model reads `SOUL.md` and asks the user for 
 ## Updating
 
 ```bash
-cd lm-studio-agent-server
+cd aura-mcp-server
 git pull  # or copy new files
 npm install
 npm run build

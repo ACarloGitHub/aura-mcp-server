@@ -30,7 +30,7 @@ export async function wikiIngestTool(args: WikiIngestArgs): Promise<any> {
       case "update_log":
         return await wikiUpdateLog(args);
       default:
-        throw new Error(`Azione wiki_ingest sconosciuta: ${args.action}`);
+        throw new Error(`Unknown wiki_ingest action: ${args.action}`);
     }
   } catch (error) {
     return formatError(error);
@@ -38,7 +38,7 @@ export async function wikiIngestTool(args: WikiIngestArgs): Promise<any> {
 }
 
 async function wikiIngest(args: WikiIngestArgs): Promise<any> {
-  if (!args.source) throw new Error("Parametro richiesto: source (percorso del file raw da processare)");
+  if (!args.source) throw new Error("Required parameter: source (path of the raw file to process)");
 
   const wikiRoot = getWikiRoot();
   const sourcePath = args.source.startsWith("/") || /^[A-Za-z]:/.test(args.source)
@@ -49,36 +49,36 @@ async function wikiIngest(args: WikiIngestArgs): Promise<any> {
   try {
     content = await readFile(sourcePath, "utf-8");
   } catch {
-    throw new Error(`File non trovato: ${sourcePath}`);
+    throw new Error(`File not found: ${sourcePath}`);
   }
 
   const fileName = basename(sourcePath, sourcePath.endsWith(".txt") ? ".txt" : ".md");
 
   return textResult(
-    `📖 Contenuto di "${fileName}" caricato (${content.length} caratteri).\n\n` +
-    `Ora devi:\n` +
-    `1. Creare un summary in wiki/summaries/${fileName}.md\n` +
-    `2. Identificare concetti e creare pagine in wiki/concepts/\n` +
-    `3. Identificare entità e creare pagine in wiki/entities/\n` +
-    `4. Aggiungere cross-links tra le pagine\n` +
-    `5. Aggiornare wiki/index.md\n` +
-    `6. Aggiornare wiki/log.md\n\n` +
-    `Il contenuto è pronto per la tua analisi.`
+    `📖 Content of "${fileName}" loaded (${content.length} characters).\n\n` +
+    `Now you need to:\n` +
+    `1. Create a summary in wiki/summaries/${fileName}.md\n` +
+    `2. Identify concepts and create pages in wiki/concepts/\n` +
+    `3. Identify entities and create pages in wiki/entities/\n` +
+    `4. Add cross-links between pages\n` +
+    `5. Update wiki/index.md\n` +
+    `6. Update wiki/log.md\n\n` +
+    `The content is ready for your analysis.`
   );
 }
 
 async function wikiQuery(args: WikiIngestArgs): Promise<any> {
-  if (!args.query_text) throw new Error("Parametro richiesto: query_text");
+  if (!args.query_text)     throw new Error("Required parameter: query_text");
 
   let indexContent = "";
   try {
     indexContent = await readFile(INDEX_PATH(), "utf-8");
   } catch {
-    return textResult("Index non trovato. La wiki potrebbe essere vuota.");
+    return textResult("Index not found. The wiki may be empty.");
   }
 
   return textResult(
-    `Indice wiki caricato. Usa la wiki search/read per trovare le pagine rilevanti per: "${args.query_text}"\n\n${indexContent.substring(0, 2000)}`
+    `Wiki index loaded. Use wiki search/read to find relevant pages for: "${args.query_text}"\n\n${indexContent.substring(0, 2000)}`
   );
 }
 
@@ -92,7 +92,7 @@ async function wikiLint(): Promise<any> {
     try {
       await readFile(f, "utf-8");
     } catch {
-      issues.push(`MANCANTE: ${basename(f)}`);
+      issues.push(`MISSING: ${basename(f)}`);
     }
   }
 
@@ -104,15 +104,15 @@ async function wikiLint(): Promise<any> {
       const relativePath = pagePath.replace(wikiRoot, "").replace(/^[\\\/]/, "");
 
       if (!content.startsWith("---")) {
-        issues.push(`FRONTMATTER MANCANTE: ${relativePath}`);
+        issues.push(`MISSING FRONTMATTER: ${relativePath}`);
       }
 
       if (!content.includes("[[") && !relativePath.includes("index.md") && !relativePath.includes("log.md")) {
-        issues.push(`PAGINA ORFANA: ${relativePath}`);
+        issues.push(`ORPHAN PAGE: ${relativePath}`);
       }
 
       if (content.startsWith("---") && !content.includes("confidence:")) {
-        issues.push(`CONFIDENCE MANCANTE: ${relativePath}`);
+        issues.push(`MISSING CONFIDENCE: ${relativePath}`);
       }
     } catch {
       // skip
@@ -120,10 +120,10 @@ async function wikiLint(): Promise<any> {
   }
 
   const report = issues.length === 0
-    ? "✅ Wiki in salute! Nessun problema trovato."
-    : `⚠️ Trovati ${issues.length} problemi:\n\n${issues.map((i, idx) => `${idx + 1}. ${i}`).join("\n")}`;
+    ? "✅ Wiki is healthy! No issues found."
+    : `⚠️ Found ${issues.length} issues:\n\n${issues.map((i, idx) => `${idx + 1}. ${i}`).join("\n")}`;
 
-  return textResult(`🔍 Wiki Lint Report\n\n${report}\n\nPagine totali: ${pages.length}`);
+  return textResult(`🔍 Wiki Lint Report\n\n${report}\n\nTotal pages: ${pages.length}`);
 }
 
 async function wikiUpdateIndex(): Promise<any> {
@@ -153,14 +153,14 @@ async function wikiUpdateIndex(): Promise<any> {
     }
   }
 
-  const progettiPath = join(wikiRoot, "progetti");
+  const progettiPath = join(wikiRoot, "projects");
   try {
-    await scanProjectPages(progettiPath, "progetti", pages);
+    await scanProjectPages(progettiPath, "projects", pages);
   } catch {
     // no progetti yet
   }
 
-  let indexContent = `# Wiki Index\n\n_Aggiornato: ${TODAY}_\n\n`;
+  let indexContent = `# Wiki Index\n\n_Updated: ${TODAY}_\n\n`;
 
   const grouped: Record<string, typeof pages> = {};
   for (const page of pages) {
@@ -180,18 +180,18 @@ async function wikiUpdateIndex(): Promise<any> {
 
   await writeFile(INDEX_PATH(), indexContent, "utf-8");
 
-  return textResult(`📋 Indice aggiornato con ${pages.length} pagine.`);
+  return textResult(`📋 Index updated with ${pages.length} pages.`);
 }
 
 async function wikiUpdateLog(args: WikiIngestArgs): Promise<any> {
-  const entry = args.source || "Operazione generica";
+  const entry = args.source || "Generic operation";
   const logEntry = `\n## [${TODAY}] ${entry}\n`;
 
   try {
     await appendFile(LOG_PATH(), logEntry, "utf-8");
     return textResult(`📝 Log aggiornato: ${entry}`);
   } catch {
-    const newLog = `# Wiki Log\n\n_Operazioni sulla wiki_\n${logEntry}`;
+    const newLog = `# Wiki Log\n\n_Wiki operations_\n${logEntry}`;
     await writeFile(LOG_PATH(), newLog, "utf-8");
     return textResult(`📝 Log creato e aggiornato: ${entry}`);
   }
@@ -211,7 +211,7 @@ function singularType(type: string): string {
     concepts: "concept",
     entities: "entity",
     syntheses: "synthesis",
-    progetti: "progetto",
+    projects: "project",
   };
   return map[type] || type;
 }
@@ -249,7 +249,7 @@ async function scanProjectPages(
         try {
           const content = await readFile(fullPath, "utf-8");
           const title = extractTitle(content) || entry.name.replace(".md", "");
-          pages.push({ path: `${prefix}/${entry.name}`, title, type: "progetto" });
+          pages.push({ path: `${prefix}/${entry.name}`, title, type: "project" });
         } catch {
           // skip
         }
