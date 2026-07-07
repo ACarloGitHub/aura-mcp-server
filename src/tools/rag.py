@@ -29,8 +29,8 @@ import chromadb
 from chromadb.config import Settings
 
 # ─── Config ──────────────────────────────────────────────────────────────────
-_script_dir = Path(__file__).resolve().parent       # aura-mcp-server/src/tools/
-_server_dir = _script_dir.parent.parent               # aura-mcp-server/
+_script_dir = Path(__file__).resolve().parent       # auramcp-server/src/tools/
+_server_dir = _script_dir.parent.parent               # auramcp-server/
 
 BASE_DIR = _server_dir
 CHROMA_DIR = str(BASE_DIR / "rag" / "chroma_data")

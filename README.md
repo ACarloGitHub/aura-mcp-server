@@ -1,4 +1,4 @@
-# 🤖 Aura MCP Server
+# 🤖 AuraMCP Server
 
 A powerful [MCP](https://modelcontextprotocol.io) server for [AnythingLLM](https://anythingllm.com) and [LM Studio](https://lmstudio.ai) that gives your local LLM persistent memory, semantic search, a structured wiki, planner, session compaction, desktop notifications and direct AnythingLLM integration — all local, all private.
 
@@ -45,24 +45,24 @@ A powerful [MCP](https://modelcontextprotocol.io) server for [AnythingLLM](https
 ### Windows
 
 ```bat
-git clone https://github.com/ACarloGitHub/aura-mcp-server.git
-cd aura-mcp-server
+git clone https://github.com/ACarloGitHub/auramcp-server.git
+cd auramcp-server
 install.bat
 ```
 
 ### Linux / macOS / WSL
 
 ```bash
-git clone https://github.com/ACarloGitHub/aura-mcp-server.git
-cd aura-mcp-server
+git clone https://github.com/ACarloGitHub/auramcp-server.git
+cd auramcp-server
 chmod +x install.sh && ./install.sh
 ```
 
 ### Manual
 
 ```bash
-git clone https://github.com/ACarloGitHub/aura-mcp-server.git
-cd aura-mcp-server
+git clone https://github.com/ACarloGitHub/auramcp-server.git
+cd auramcp-server
 npm install
 npm run build
 ```
@@ -72,9 +72,9 @@ Then add to your MCP config (see `lm-studio-config.example.json`):
 ```json
 {
   "mcpServers": {
-    "aura-mcp-server": {
+    "auramcp-server": {
       "command": "node",
-      "args": ["/path/to/aura-mcp-server/dist/index.js"],
+      "args": ["/path/to/auramcp-server/dist/index.js"],
       "env": {
         "AGENT_WORKSPACE": "/path/to/your/workspace"
       }
@@ -140,7 +140,7 @@ After the first install no further setup is needed; the server picks up `embeddi
 ## Project Structure
 
 ```
-aura-mcp-server/
+auramcp-server/
 ├── SOUL.md                  # Agent personality (template — filled at first boot)
 ├── USER.md                  # User profile (template — filled over time)
 ├── MEMORY.md                # Working memory (template)

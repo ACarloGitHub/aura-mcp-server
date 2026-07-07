@@ -20,8 +20,8 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-_script_dir = Path(__file__).resolve().parent  # aura-mcp-server/src/tools/
-_server_dir = _script_dir.parent.parent           # aura-mcp-server/
+_script_dir = Path(__file__).resolve().parent  # auramcp-server/src/tools/
+_server_dir = _script_dir.parent.parent           # auramcp-server/
 _project_root = _server_dir.parent                # parent workspace dir
 
 WORKSPACE = os.environ.get("AGENT_WORKSPACE", str(_project_root))

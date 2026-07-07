@@ -1,6 +1,6 @@
 # Architecture (v3.0)
 
-Aura MCP Server is a thin TypeScript process that speaks MCP over stdio. The host (AnythingLLM or LM Studio) spawns one instance per workspace and sends JSON-RPC requests.
+AuraMCP Server is a thin TypeScript process that speaks MCP over stdio. The host (AnythingLLM or LM Studio) spawns one instance per workspace and sends JSON-RPC requests.
 
 ## Pipeline
 
@@ -13,7 +13,7 @@ host (AnythingLLM / LM Studio)
   ▼
 stdio (MCP SDK 1.29)
   │
-aura-mcp-server (Node.js, ESM)
+auramcp-server (Node.js, ESM)
   ├─ src/index.ts                # server + dispatch
   ├─ src/utils/                  # helpers + sandbox + truncate + resultWrapper
   └─ src/tools/                  # 11 tool implementations

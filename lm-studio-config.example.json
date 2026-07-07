@@ -1,9 +1,9 @@
 {
   "_comment": "Copy to lm-studio-config.json and fill in your values. On Windows use double backslashes: C:\\\\Users\\\\you\\\\workspace",
   "mcpServers": {
-    "aura-mcp-server": {
+    "auramcp-server": {
       "command": "node",
-      "args": ["/path/to/aura-mcp-server/dist/index.js"],
+      "args": ["/path/to/auramcp-server/dist/index.js"],
       "env": {
         "AGENT_WORKSPACE": "/path/to/your/workspace",
         "ANYTHINGLLM_API_KEY": "your-anythingllm-api-key-here"

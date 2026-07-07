@@ -1,6 +1,6 @@
 # Installing v3.0
 
-This document covers installing Aura MCP Server v3.0 and wiring it into either AnythingLLM or LM Studio.
+This document covers installing AuraMCP Server v3.0 and wiring it into either AnythingLLM or LM Studio.
 
 ## Requirements
 
@@ -12,8 +12,8 @@ This document covers installing Aura MCP Server v3.0 and wiring it into either A
 ## Clone and Build
 
 ```bash
-git clone https://github.com/ACarloGitHub/aura-mcp-server.git
-cd aura-mcp-server
+git clone https://github.com/ACarloGitHub/auramcp-server.git
+cd auramcp-server
 npm install        # or `npm ci` for a reproducible install
 npm run build      # produces dist/index.js
 ```
@@ -42,9 +42,9 @@ AnythingLLM stores its MCP server list at `<storage>/plugins/anythingllm_mcp_ser
 ```json
 {
   "mcpServers": {
-    "aura-mcp-server": {
+    "auramcp-server": {
       "command": "node",
-      "args": ["W:/SviluppoProgetti/aura-mcp-server/dist/index.js"],
+      "args": ["W:/SviluppoProgetti/auramcp-server/dist/index.js"],
       "env": {
         "AGENT_WORKSPACE": "W:/SviluppoProgetti/aura-workspace"
       }
@@ -62,9 +62,9 @@ LM Studio stores its MCP config at `~/.lmstudio/mcp.json` (or `%USERPROFILE%\.lm
 ```json
 {
   "mcpServers": {
-    "aura-mcp-server": {
+    "auramcp-server": {
       "command": "node",
-      "args": ["W:/SviluppoProgetti/aura-mcp-server/dist/index.js"],
+      "args": ["W:/SviluppoProgetti/auramcp-server/dist/index.js"],
       "env": {
         "AGENT_WORKSPACE": "W:/SviluppoProgetti/aura-workspace"
       }
@@ -84,7 +84,7 @@ LM Studio reads the file whenever you save it. Tools appear under the Program ta
 ## Updating
 
 ```bash
-cd aura-mcp-server
+cd auramcp-server
 git pull
 npm ci
 npm run build
@@ -94,7 +94,7 @@ Then restart the host application (or just close and reopen the Agent Skills pag
 
 ## Troubleshooting
 
-- **Server does not start**: check stderr for `Aura MCP Server v3.0 started on stdio`. If you don't see that line within a few seconds of opening the host, the path or env is wrong.
+- **Server does not start**: check stderr for `AuraMCP Server v3.0 started on stdio`. If you don't see that line within a few seconds of opening the host, the path or env is wrong.
 - **`Unknown tool: <name>`**: the host is calling a v2.x granular name. Hosts update automatically when they reload the descriptor list; just close and reopen the agent panel.
 - **`Sandbox: Path outside AGENT_WORKSPACE ...`**: the model tried to read or write outside the workspace. Either fix the prompt or add the path to `AURA_ALLOWED_PATHS`.
 - **DuckDuckGo CAPTCHA**: rare; wait a few minutes before retrying.

@@ -19,7 +19,7 @@ async function getApiKey(argsKey?: string): Promise<string> {
   // 2. Env var
   if (process.env.ANYTHINGLLM_API_KEY) return process.env.ANYTHINGLLM_API_KEY;
 
-  // 3. File api-key.json nella cartella del server (e.g. aura-mcp-server/api-key.json)
+  // 3. File api-key.json nella cartella del server (e.g. auramcp-server/api-key.json)
   //    Cerca prima nella dir del server, poi nel workspace
   const candidates = [
     join(_serverDir, "api-key.json"),

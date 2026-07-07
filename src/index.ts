@@ -380,7 +380,7 @@ function autoNotify(name: string, rawResult: any): void {
           }
         }
 
-        sendWinRTToast("Aura MCP", body);
+        sendWinRTToast("AuraMCP", body);
       }
     } catch {
       // fire-and-forget: ignore all errors
@@ -393,7 +393,7 @@ function autoNotify(name: string, rawResult: any): void {
 // ============================================================
 const server = new Server(
   {
-    name: "aura-mcp-server",
+    name: "auramcp-server",
     version: "3.0.0",
   },
   {
@@ -532,7 +532,7 @@ async function main() {
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Aura MCP Server v3.0 started on stdio");
+  console.error("AuraMCP Server v3.0 started on stdio");
 }
 
 main().catch((error) => {

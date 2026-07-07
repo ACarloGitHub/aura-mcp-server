@@ -1,6 +1,6 @@
 # Environment Variables
 
-Aura MCP Server reads all configuration from environment variables. They are read once at boot except for `AGENT_WORKSPACE` and the helpers in `src/utils/helpers.ts`, which resolve at call time. `AURA_ENABLED_CATEGORIES` filters `tools/list` at boot; restart the server to change it.
+AuraMCP Server reads all configuration from environment variables. They are read once at boot except for `AGENT_WORKSPACE` and the helpers in `src/utils/helpers.ts`, which resolve at call time. `AURA_ENABLED_CATEGORIES` filters `tools/list` at boot; restart the server to change it.
 
 ## Server
 
@@ -71,9 +71,9 @@ Or in the host's MCP config (`mcpServers[*].env`):
 ```json
 {
   "mcpServers": {
-    "aura-mcp-server": {
+    "auramcp-server": {
       "command": "node",
-      "args": ["/path/to/aura-mcp-server/dist/index.js"],
+      "args": ["/path/to/auramcp-server/dist/index.js"],
       "env": {
         "AGENT_WORKSPACE": "/path/to/workspace"
       }

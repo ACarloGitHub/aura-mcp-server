@@ -75,7 +75,7 @@ $toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
 
 export async function notifyTool(args: NotifyArgs): Promise<any> {
   try {
-    const title = args.title || "Aura MCP";
+    const title = args.title || "AuraMCP";
     const message = args.message || "Notification from MCP server";
     const withSound = args.sound !== false;
 
