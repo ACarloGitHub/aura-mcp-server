@@ -14,7 +14,7 @@
               "type": "empty",
               "state": {},
               "icon": "lucide-file",
-              "title": "Nuova scheda"
+              "title": "New tab"
             }
           }
         ]
@@ -40,7 +40,7 @@
                 "autoReveal": false
               },
               "icon": "lucide-folder-closed",
-              "title": "Esplora risorse"
+              "title": "File explorer"
             }
           },
           {
@@ -57,7 +57,7 @@
                 "sortOrder": "alphabetical"
               },
               "icon": "lucide-search",
-              "title": "Ricerca"
+              "title": "Search"
             }
           },
           {
@@ -67,7 +67,7 @@
               "type": "bookmarks",
               "state": {},
               "icon": "lucide-bookmark",
-              "title": "Segnalibri"
+              "title": "Bookmarks"
             }
           }
         ]
@@ -99,7 +99,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Riferimenti"
+              "title": "Backlinks"
             }
           },
           {
@@ -112,7 +112,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Collegamenti in uscita"
+              "title": "Outgoing links"
             }
           },
           {
@@ -127,7 +127,7 @@
                 "searchQuery": ""
               },
               "icon": "lucide-tags",
-              "title": "Etichette"
+              "title": "Tags"
             }
           },
           {
@@ -141,7 +141,7 @@
                 "searchQuery": ""
               },
               "icon": "lucide-archive",
-              "title": "Tutte le proprietà"
+              "title": "All properties"
             }
           },
           {
@@ -155,7 +155,7 @@
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Struttura"
+              "title": "Outline"
             }
           }
         ]
@@ -167,13 +167,13 @@
   },
   "left-ribbon": {
     "hiddenItems": {
-      "switcher:Apri selezione rapida": false,
-      "graph:Apri vista grafo": false,
-      "canvas:Crea nuova lavagna": false,
-      "daily-notes:Apri nota del giorno": false,
-      "templates:Inserisci modello": false,
-      "command-palette:Apri riquadro comandi": false,
-      "bases:Crea nuova Base": false
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new Base": false
     }
   },
   "active": "b899edd052cf752a",
