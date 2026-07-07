@@ -75,6 +75,20 @@ let TOOLS: Tool[] = [
       },
       required: ["action"],
     },
+    outputSchema: {
+      type: "object",
+      properties: {
+        jobId: { type: "string" },
+        running: { type: "boolean" },
+        exitCode: { type: ["number", "null"] },
+        pid: { type: ["number", "null"] },
+        command: { type: "string" },
+        startedAt: { type: "string" },
+        stdoutTail: { type: "string" },
+        stderrTail: { type: "string" },
+      },
+      required: ["jobId", "running", "command", "startedAt", "stdoutTail", "stderrTail"],
+    },
   },
   {
     name: "web_search",
@@ -87,6 +101,27 @@ let TOOLS: Tool[] = [
         engine: { type: "string", enum: ["duckduckgo", "brave"], description: "Search engine" },
       },
       required: ["query"],
+    },
+    outputSchema: {
+      type: "object",
+      properties: {
+        engine: { type: "string", enum: ["duckduckgo", "brave"] },
+        query: { type: "string" },
+        count: { type: "number" },
+        results: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              url: { type: "string" },
+              snippet: { type: "string" },
+            },
+            required: ["title", "url", "snippet"],
+          },
+        },
+      },
+      required: ["engine", "query", "count", "results"],
     },
   },
   {
@@ -102,6 +137,26 @@ let TOOLS: Tool[] = [
         maxResults: { type: "number", description: "Max results (action=search/list, default 10)" },
       },
       required: ["action"],
+    },
+    outputSchema: {
+      type: "object",
+      properties: {
+        total: { type: "number" },
+        shown: { type: "number" },
+        pages: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              path: { type: "string" },
+              title: { type: "string" },
+              modified: { type: "string" },
+            },
+            required: ["path", "title", "modified"],
+          },
+        },
+      },
+      required: ["total", "shown", "pages"],
     },
   },
   {
@@ -136,6 +191,27 @@ let TOOLS: Tool[] = [
       },
       required: ["action"],
     },
+    outputSchema: {
+      type: "object",
+      properties: {
+        collection: { type: "string" },
+        query: { type: "string" },
+        count: { type: "number" },
+        results: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              text: { type: "string" },
+              distance: { type: ["number", "null"] },
+              metadata: { type: "object" },
+            },
+            required: ["text", "metadata"],
+          },
+        },
+      },
+      required: ["collection", "query", "count", "results"],
+    },
   },
   {
     name: "planner",
@@ -150,6 +226,18 @@ let TOOLS: Tool[] = [
       },
       required: ["action"],
     },
+    outputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        total: { type: "number" },
+        completed: { type: "number" },
+        remaining: { type: "number" },
+        percentage: { type: "number" },
+        blockingQuestion: { type: ["string", "null"] },
+      },
+      required: ["name", "total", "completed", "remaining", "percentage"],
+    },
   },
   {
     name: "compact",
@@ -161,6 +249,39 @@ let TOOLS: Tool[] = [
         threshold: { type: "number", description: "Line threshold (action=memory, default 300)" },
       },
       required: ["action"],
+    },
+    outputSchema: {
+      type: "object",
+      properties: {
+        memory: {
+          type: "object",
+          properties: {
+            path: { type: "string" },
+            lines: { type: ["number", "null"] },
+            threshold: { type: "number" },
+            compactionRecommended: { type: "boolean" },
+          },
+          required: ["path", "threshold", "compactionRecommended"],
+        },
+        archive: {
+          type: "object",
+          properties: {
+            path: { type: "string" },
+            exists: { type: "boolean" },
+            sizeKB: { type: ["number", "null"] },
+          },
+          required: ["path", "exists"],
+        },
+        compactedSessions: {
+          type: "object",
+          properties: {
+            path: { type: "string" },
+            count: { type: "number" },
+          },
+          required: ["path", "count"],
+        },
+      },
+      required: ["memory", "archive", "compactedSessions"],
     },
   },
   {

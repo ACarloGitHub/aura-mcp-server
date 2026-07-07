@@ -195,6 +195,11 @@ async function listWikiPages(maxResults: number): Promise<any> {
           "Briefly list the wiki pages. Group by relevant category if obvious."
         ),
       }],
+      structuredContent: {
+        total: pages.length,
+        shown: results.length,
+        pages: results.map((r) => ({ path: r.path, title: r.title, modified: r.modified })),
+      },
     };
   } catch (error) {
     throw new Error(`Wiki list error: ${(error as Error).message}`);

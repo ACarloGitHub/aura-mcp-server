@@ -362,5 +362,13 @@ async function planStatus(name: string): Promise<any> {
         "Do NOT repeat the plan content or list all tasks. Summarize progress in 1-2 sentences: percent complete, remaining count, and any blocking question."
       ),
     }],
+    structuredContent: {
+      name,
+      total,
+      completed,
+      remaining,
+      percentage,
+      blockingQuestion: blockingQuestion ?? null,
+    },
   };
 }

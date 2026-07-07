@@ -106,6 +106,16 @@ async function ragSearch(args: RagArgs): Promise<any> {
         "Summarize the most relevant snippets. Cite by index and distance. Do not paste every chunk verbatim."
       ),
     }],
+    structuredContent: {
+      collection: args.collection,
+      query: args.query,
+      count: parsed.results?.length || 0,
+      results: (parsed.results || []).map((r: any) => ({
+        text: r.text ?? "",
+        distance: r.distance ?? null,
+        metadata: r.metadata ?? {},
+      })),
+    },
   };
 }
 

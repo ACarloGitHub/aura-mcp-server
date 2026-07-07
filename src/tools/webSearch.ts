@@ -174,6 +174,12 @@ function formatResults(query: string, results: SearchResult[], source: string): 
           "Tell the user that no results were found and suggest alternative search terms."
         ),
       }],
+      structuredContent: {
+        engine: source.toLowerCase() === "brave" ? "brave" : "duckduckgo",
+        query,
+        count: 0,
+        results: [],
+      },
     };
   }
 
@@ -190,5 +196,11 @@ function formatResults(query: string, results: SearchResult[], source: string): 
         "Summarize the most relevant 2-3 results for the user. Do NOT list all results verbatim. Pick the most relevant ones and describe them briefly in your own words."
       ),
     }],
+    structuredContent: {
+      engine: source.toLowerCase() === "brave" ? "brave" : "duckduckgo",
+      query,
+      count: trimmed.length,
+      results: trimmed.map((r) => ({ title: r.title, url: r.url, snippet: r.description })),
+    },
   };
 }

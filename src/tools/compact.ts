@@ -104,46 +104,61 @@ async function memoryCompact(args: CompactArgs): Promise<any> {
 }
 
 async function compactStatus(_args: CompactArgs): Promise<any> {
-  const results: string[] = [];
+  const lines: string[] = [];
+  const structured: {
+    memory: { path: string; lines: number | null; threshold: number; compactionRecommended: boolean };
+    archive: { path: string; exists: boolean; sizeKB: number | null };
+    compactedSessions: { path: string; count: number };
+  } = {
+    memory: { path: resolve(getWorkspace(), "MEMORY.md"), lines: null, threshold: MEMORY_THRESHOLD_DEFAULT, compactionRecommended: false },
+    archive: { path: resolve(getWorkspace(), "memory-archive.md"), exists: false, sizeKB: null },
+    compactedSessions: { path: COMPACTED_DIR(), count: 0 },
+  };
   const workspace = getWorkspace();
 
   const memoryPath = resolve(workspace, "MEMORY.md");
   try {
     const content = await readFile(memoryPath, "utf-8");
-    const lines = content.split("\n").length;
-    const needsCompact = lines > MEMORY_THRESHOLD_DEFAULT;
-    results.push(
-      `MEMORY.md: ${lines} righe (soglia: ${MEMORY_THRESHOLD_DEFAULT})${needsCompact ? " - COMPACTION RECOMMENDED" : ""}`
+    const lineCount = content.split("\n").length;
+    const needsCompact = lineCount > MEMORY_THRESHOLD_DEFAULT;
+    structured.memory.lines = lineCount;
+    structured.memory.compactionRecommended = needsCompact;
+    lines.push(
+      `MEMORY.md: ${lineCount} righe (soglia: ${MEMORY_THRESHOLD_DEFAULT})${needsCompact ? " - COMPACTION RECOMMENDED" : ""}`
     );
   } catch {
-    results.push("MEMORY.md: not found");
+    lines.push("MEMORY.md: not found");
   }
 
   const archivePath = resolve(workspace, "memory-archive.md");
   try {
     const content = await readFile(archivePath, "utf-8");
     const archSize = Math.round(Buffer.byteLength(content, "utf-8") / 1024);
-    results.push(`memory-archive.md: ${archSize} KB`);
+    structured.archive.exists = true;
+    structured.archive.sizeKB = archSize;
+    lines.push(`memory-archive.md: ${archSize} KB`);
   } catch {
-    results.push("memory-archive.md: doesn't exist yet");
+    lines.push("memory-archive.md: doesn't exist yet");
   }
 
   try {
     const files = await readdir(COMPACTED_DIR());
     const mdFiles = files.filter((f) => f.endsWith(".md"));
-    results.push(`compacted-sessions/: ${mdFiles.length} compacted sessions`);
+    structured.compactedSessions.count = mdFiles.length;
+    lines.push(`compacted-sessions/: ${mdFiles.length} compacted sessions`);
   } catch {
-    results.push("compacted-sessions/: empty or does not exist");
+    lines.push("compacted-sessions/: empty or does not exist");
   }
 
   return {
     content: [{
       type: "text",
       text: wrapWithInstruction(
-        results.join("\n"),
+        lines.join("\n"),
         "Briefly summarize memory status. If compaction is recommended, mention it explicitly."
       ),
     }],
+    structuredContent: structured,
   };
 }
 

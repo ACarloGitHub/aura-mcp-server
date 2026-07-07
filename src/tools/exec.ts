@@ -230,6 +230,16 @@ export async function execPollTool(args: { jobId: string; tail?: number }): Prom
         "Condense the tailed output. Highlight what changed since the last poll."
       ),
     }],
+    structuredContent: {
+      jobId: args.jobId,
+      running: !!job.running,
+      exitCode: job.exitCode ?? null,
+      pid: job.pid ?? null,
+      command: job.command,
+      startedAt: job.startedAt,
+      stdoutTail: tailStdout,
+      stderrTail: tailStderr,
+    },
   };
 }
 
