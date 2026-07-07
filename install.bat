@@ -1,26 +1,57 @@
 @echo off
 setlocal EnableDelayedExpansion
-REM install.bat — Automatic MCP server setup on Windows
-REM Usage: double-click or run from cmd in the mcp-server/ folder
+REM install.bat — AuraMCP Server install on Windows.
+REM Prompts for an installation directory (default: the directory this script lives in),
+REM then creates a Workspace\ subfolder inside it and points AGENT_WORKSPACE there.
 
 echo =========================================
-echo  Aura MCP Server — Installation
+echo  AuraMCP Server - Installation
 echo =========================================
 echo.
 
-REM Verifica Node.js
+set "SCRIPT_DIR=%~dp0"
+if "%SCRIPT_DIR:~-1%"=="\" set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
+
+set "DEFAULT_INSTALL_DIR=%SCRIPT_DIR%"
+set /p "INSTALL_DIR=Install location [%DEFAULT_INSTALL_DIR%]: "
+if "%INSTALL_DIR%"=="" set "INSTALL_DIR=%DEFAULT_INSTALL_DIR%"
+
+REM Trim trailing backslash
+if "%INSTALL_DIR:~-1%"=="\" set "INSTALL_DIR=%INSTALL_DIR:~0,-1%"
+
+if not exist "%INSTALL_DIR%" (
+    echo [INFO] Creating %INSTALL_DIR%
+    mkdir "%INSTALL_DIR%"
+)
+
+set "INSTALL_BIN_DIR=%INSTALL_DIR%\bin"
+set "WORKSPACE_DIR=%INSTALL_DIR%\Workspace"
+
+REM Lay out: installer always operates on its own folder; symlinks back to the
+REM project tree are useful when install/launch are different folders.
+set "PROJECT_ROOT=%SCRIPT_DIR%"
+
+REM Workspace under the chosen install dir
+if not exist "%WORKSPACE_DIR%" mkdir "%WORKSPACE_DIR%"
+
+REM Seed Workspace with the agent templates if missing
+if not exist "%WORKSPACE_DIR%\SOUL.md"   copy /y "%PROJECT_ROOT%\SOUL.md"   "%WORKSPACE_DIR%\SOUL.md" > nul
+if not exist "%WORKSPACE_DIR%\USER.md"   copy /y "%PROJECT_ROOT%\USER.md"   "%WORKSPACE_DIR%\USER.md" > nul
+if not exist "%WORKSPACE_DIR%\MEMORY.md" copy /y "%PROJECT_ROOT%\MEMORY.md" "%WORKSPACE_DIR%\MEMORY.md" > nul
+if not exist "%WORKSPACE_DIR%\Wiki"      mkdir "%WORKSPACE_DIR%\Wiki"
+if not exist "%WORKSPACE_DIR%\plans"     mkdir "%WORKSPACE_DIR%\plans"
+if not exist "%WORKSPACE_DIR%\compacted-sessions" mkdir "%WORKSPACE_DIR%\compacted-sessions"
+
+REM --- Tooling checks ---
 node --version > nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Node.js not found.
-    echo Download from https://nodejs.org/ (LTS recommended)
-    echo.
+    echo [ERROR] Node.js not found. Install from https://nodejs.org/ (LTS recommended^).
     pause
     exit /b 1
 )
 for /f "tokens=*" %%a in ('node --version') do set NODE_VER=%%a
 echo [OK] Node.js found: %NODE_VER%
 
-REM Verifica npm
 npm --version > nul 2>&1
 if errorlevel 1 (
     echo [ERROR] npm not found.
@@ -30,50 +61,15 @@ if errorlevel 1 (
 for /f "tokens=*" %%a in ('npm --version') do set NPM_VER=%%a
 echo [OK] npm found: %NPM_VER%
 
-echo.
-echo [INFO] Checking Python...
-echo.
 python --version > nul 2>&1
 if errorlevel 1 (
-    echo [WARN] Python not found in PATH.
-    echo RAG, session_export and the anythingllm tool with advanced features
-    echo require Python with chromadb. You can skip this now and configure it later.
-    pause
+    echo [WARN] Python not found. The RAG tool requires Python with chromadb.
 ) else (
-    echo [OK] Python found.
-    echo.
-    echo [INFO] Checking chromadb in global Python...
-    python -c "import chromadb" > nul 2>&1
-    if errorlevel 1 (
-        echo [WARN] chromadb not found in global Python.
-        echo.
-        choice /C YN /M "Create a dedicated venv with chromadb"
-        if errorlevel 2 (
-            echo [INFO] Venv not created. RAG will not work until you install chromadb.
-            echo You can do this later with: pip install chromadb
-        ) else (
-            echo [INFO] Creating .venv...
-            python -m venv .venv
-            if errorlevel 1 (
-                echo [ERROR] Venv creation failed.
-                pause
-                exit /b 1
-            )
-            echo [OK] Venv created. Installing chromadb...
-            .venv\Scripts\pip install chromadb
-            if errorlevel 1 (
-                echo [ERROR] chromadb installation failed.
-                pause
-                exit /b 1
-            )
-            echo [OK] chromadb installed in venv.
-        )
-    ) else (
-        echo [OK] chromadb available in global Python.
-    )
+    for /f "tokens=*" %%a in ('python --version') do set PY_VER=%%a
+    echo [OK] Python found: %PY_VER%
 )
 
-REM Install npm dependencies
+REM --- Install dependencies + build ---
 echo.
 echo [INFO] Installing npm dependencies...
 npm install
@@ -84,35 +80,52 @@ if errorlevel 1 (
 )
 echo [OK] Dependencies installed.
 
-REM Build TypeScript
 echo.
 echo [INFO] Compiling TypeScript...
 npm run build
 if errorlevel 1 (
     echo [ERROR] Build failed.
-    echo Make sure TypeScript is installed: npm install -g typescript
     pause
     exit /b 1
 )
 echo [OK] Build completed.
 
-REM Create logs directory if it doesn't exist
-if not exist logs mkdir logs
+REM --- Optional embeddings setup ---
+echo.
+echo [INFO] Downloading llama.cpp + nomic-embed-text-v1.5 GGUF for RAG...
+call scripts\install_embeddings.bat
+if errorlevel 1 (
+    echo [WARN] Embeddings download skipped or failed. You can run scripts\install_embeddings.bat manually later.
+)
+
+REM --- Install launcher into chosen bin dir ---
+if not exist "%INSTALL_BIN_DIR%" mkdir "%INSTALL_BIN_DIR%"
+
+(
+    echo @echo off
+    echo setlocal
+    echo REM Auto-generated by install.bat.
+    echo set "PROJECT_ROOT=%PROJECT_ROOT%"
+    echo set "WORKSPACE_DIR=%WORKSPACE_DIR%"
+    echo set "AGENT_WORKSPACE=%%WORKSPACE_DIR%%"
+    echo cd /d "%%PROJECT_ROOT%%"
+    echo node dist\index.js
+) > "%INSTALL_BIN_DIR%\auramcp-server.bat"
 
 echo.
 echo =========================================
 echo  Installation completed!
 echo =========================================
 echo.
-echo Workspace: %AGENT_WORKSPACE%
+echo   Install dir:  %INSTALL_DIR%
+echo   Project root: %PROJECT_ROOT%
+echo   Workspace:    %WORKSPACE_DIR%
 echo.
-echo To start the server normally:
-echo   start.bat
+echo Launcher written to:
+echo   %INSTALL_BIN_DIR%\auramcp-server.bat
 echo.
-echo To start in debug mode (with file logging):
-echo   debug-server.bat
-echo.
-echo Remember: set AGENT_WORKSPACE=absolute-path-to-workspace
-echo in AnythingLLM environment variables if not using start.bat
+echo Point AnythingLLM / LM Studio at:
+echo   command: "%INSTALL_BIN_DIR%\auramcp-server.bat"
+echo   or, directly: node "%PROJECT_ROOT%\dist\index.js" with AGENT_WORKSPACE=%WORKSPACE_DIR%
 echo.
 pause

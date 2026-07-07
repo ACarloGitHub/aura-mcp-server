@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
-# Avvia Aura MCP Server su Unix/WSL/Mac
-# AGENT_WORKSPACE punta alla cartella del server (dove si trovano SOUL.md, MEMORY.md, ecc.)
-# Per usare una cartella workspace diversa: export AGENT_WORKSPACE=/path/to/workspace
+# start.sh - Launch AuraMCP Server.
+# Resolves AGENT_WORKSPACE to a sibling "Workspace/" folder, falling back
+# to the script directory if Workspace does not exist.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Default: usa la cartella del server come workspace.
-# Sovrascrivi con: export AGENT_WORKSPACE=/percorso/workspace
-if [ -z "$AGENT_WORKSPACE" ]; then
-  export AGENT_WORKSPACE="$SCRIPT_DIR"
+if [ -z "${AGENT_WORKSPACE:-}" ]; then
+  if [ -d "${SCRIPT_DIR}/Workspace" ]; then
+    export AGENT_WORKSPACE="${SCRIPT_DIR}/Workspace"
+  else
+    export AGENT_WORKSPACE="${SCRIPT_DIR}"
+  fi
 fi
 
-cd "$SCRIPT_DIR" || exit 1
-exec node dist/index.js
+cd "${SCRIPT_DIR}"
+exec node dist/index.js "$@"
