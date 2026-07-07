@@ -12,9 +12,9 @@ permissions:
   attestations: write
 
 env:
-  LLAMACPP_PINNED_VERSION: "b9680"
-  NOMIC_GGUF_URL: "https://huggingface.co/nomic-ai/nomic-embed-text-v2-moe-GGUF/resolve/main/nomic-embed-text-v2-moe.Q8_0.gguf"
-  NOMIC_GGUF_SHA256: "6E7A7E594A26985523C18383ABA4AAD39FE6E14F08FFC6AB5B554E1CCDC3CFF"
+  # Runtime artefacts (llama.cpp b9680 binaries + nomic-embed GGUF) are committed
+  # to the repo under vendor/llama.cpp/<os>/ and embeddings/. No download is
+  # needed; the launcher Tauri picks them up via tauri.conf.json bundle.resources.
 
 jobs:
   build:
@@ -26,22 +26,13 @@ jobs:
         include:
           - os: windows-latest
             args: ""
-            artifact: windows-msi
-            llama_asset: "llama-b${LLAMACPP_PINNED_VERSION}-bin-win-cpu-x64.zip"
-            llama_dir: "vendor/llama.cpp/windows"
-            ext: ".exe"
+            artifact: auramcp-windows
           - os: macos-latest
-            args: "--target universal-apple-darwin"
-            artifact: macos-dmg
-            llama_asset: "llama-b${LLAMACPP_PINNED_VERSION}-bin-macos-universal.zip"
-            llama_dir: "vendor/llama.cpp/macos"
-            ext: ""
+            args: ""
+            artifact: auramcp-macos
           - os: ubuntu-latest
             args: ""
-            artifact: linux-deb
-            llama_asset: "llama-b${LLAMACPP_PINNED_VERSION}-bin-ubuntu-x64-cpu.tar.gz"
-            llama_dir: "vendor/llama.cpp/linux"
-            ext: ""
+            artifact: auramcp-linux
 
     steps:
       - name: Checkout source
@@ -69,56 +60,29 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: "src-tauri -> target"
 
+      - name: Verify vendored runtime is present
+        run: |
+          test -f "vendor/llama.cpp/${{ matrix.os == 'windows-latest' && 'windows' || (matrix.os == 'macos-latest' && 'macos' || 'linux') }}/llama-server${{ matrix.os == 'windows-latest' && '.exe' || '' }}" || (
+            echo "expected vendored llama-server missing for ${{ matrix.os }}";
+            exit 1
+          )
+          test -f "embeddings/nomic-embed-text-v2-moe.Q8_0.gguf" || (
+            echo "expected vendored GGUF missing";
+            exit 1
+          )
+          echo "runtime artefacts present for ${{ matrix.os }}"
+
       - name: Install npm dependencies
         run: npm ci
 
       - name: Compile TypeScript
         run: npm run build
-
-      - name: Download llama.cpp + nomic GGUF
-        shell: bash
-        env:
-          MATRIX_OS: ${{ matrix.os }}
-          LLAMACPP_ASSET: ${{ matrix.llama_asset }}
-          LLAMACPP_DIR: ${{ matrix.llama_dir }}
-          LLAMA_EXT: ${{ matrix.ext }}
-        run: |
-          set -euo pipefail
-          mkdir -p "${LLAMACPP_DIR}" embeddings
-          echo "Downloading ${LLAMACPP_ASSET}"
-          TMP="$(mktemp -d)"
-          trap 'rm -rf "$TMP"' EXIT
-          curl -fsSL -o "${TMP}/llama.blob" \
-            "https://github.com/ggml-org/llama.cpp/releases/download/${LLAMACPP_PINNED_VERSION}/${LLAMACPP_ASSET}"
-          case "${LLAMACPP_ASSET}" in
-            *.zip) (cd "${TMP}" && unzip -q llama.blob) ;;
-            *.tar.gz) (cd "${TMP}" && tar -xzf llama.blob) ;;
-          esac
-          BUILD_DIR="$(find "${TMP}" -type d -name 'build' | head -n 1 || true)"
-          if [[ -z "${BUILD_DIR}" ]]; then
-            BUILD_DIR="$(find "${TMP}" -type d -name 'bin' | head -n 1 || true)"
-          fi
-          cp -R "${BUILD_DIR}/." "${LLAMACPP_DIR}/"
-          chmod +x "${LLAMACPP_DIR}/llama-server${LLAMA_EXT}" || true
-          echo "llama.cpp staged at ${LLAMACPP_DIR}"
-          echo "Downloading nomic GGUF"
-          curl -fsSL -o "embeddings/nomic-embed-text-v2-moe.Q8_0.gguf" "${NOMIC_GGUF_URL}"
-          ACTUAL="$(sha256sum embeddings/nomic-embed-text-v2-moe.Q8_0.gguf | awk '{print $1}') | tr 'a-z' 'A-Z'"
-          EXPECTED="$(echo ${NOMIC_GGUF_SHA256} | tr 'a-z' 'A-Z')"
-          echo "expected sha256: ${EXPECTED}"
-          echo "actual   sha256: ${ACTUAL}"
-          if [[ "${ACTUAL}" != "${EXPECTED}" ]]; then
-            echo "nomic GGUF sha256 mismatch; refusing to proceed"
-            exit 1
-          fi
 
       - name: Build application
         uses: tauri-apps/tauri-action@v0
@@ -134,7 +98,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: auramcp-server-${{ matrix.artifact }}
+          name: ${{ matrix.artifact }}
           path: |
             src-tauri/target/**/bundle/msi/*.msi
             src-tauri/target/**/bundle/nsis/*-setup.exe
