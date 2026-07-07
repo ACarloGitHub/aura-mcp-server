@@ -1,5 +1,6 @@
 import { execSync } from "child_process";
-import { textResult, formatError } from "../utils/helpers.js";
+import { formatError } from "../utils/helpers.js";
+import { wrapWithInstruction } from "../utils/resultWrapper.js";
 
 let notifier: any = null;
 try {
@@ -119,11 +120,17 @@ export async function notifyTool(args: NotifyArgs): Promise<any> {
       playBeep();
     }
 
-    return textResult(
-      notificationSent
-        ? `Notification sent: "${title}" — ${message}${withSound ? " (with sound)" : ""}`
-        : `Notification not sent (GUI not available), but sound emitted: ${message}`
-    );
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          notificationSent
+            ? `Notification sent: "${title}" — ${message}${withSound ? " (with sound)" : ""}`
+            : `Notification not sent (GUI not available), but sound emitted: ${message}`,
+          "Confirm the notification was sent, or that only a beep played."
+        ),
+      }],
+    };
   } catch (error) {
     return formatError(error);
   }

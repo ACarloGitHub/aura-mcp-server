@@ -1,7 +1,8 @@
 import { writeFile, mkdir, readdir, readFile } from "fs/promises";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { getWorkspaceRoot, textResult, formatError } from "../utils/helpers.js";
+import { getWorkspaceRoot, formatError } from "../utils/helpers.js";
+import { wrapWithInstruction } from "../utils/resultWrapper.js";
 
 const WORKSPACE = getWorkspaceRoot();
 const SESSIONS_DIR = join(WORKSPACE, "AnythingLLMSessions");
@@ -103,7 +104,15 @@ async function listWorkspaces(apiKey: string): Promise<any> {
   const workspaces = await withApiTimeout(fetchWorkspaces(apiKey), "listWorkspaces");
 
   if (workspaces.length === 0) {
-    return textResult("No workspaces found in AnythingLLM.");
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          "No workspaces found in AnythingLLM.",
+          "Tell the user there are no workspaces to export."
+        ),
+      }],
+    };
   }
 
   const lines: string[] = ["Available AnythingLLM workspaces:\n"];
@@ -123,7 +132,15 @@ async function listWorkspaces(apiKey: string): Promise<any> {
   lines.push(`\nTo export: action=export workspace="slug" [thread="threadslug"]`);
   lines.push(`To export all: action=export-all`);
 
-  return textResult(lines.join("\n"));
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        lines.join("\n"),
+        "List the available workspaces; the model can choose which to export next."
+      ),
+    }],
+  };
 }
 
 async function exportChats(apiKey: string, workspaceSlug?: string, threadSlug?: string): Promise<any> {
@@ -134,9 +151,15 @@ async function exportChats(apiKey: string, workspaceSlug?: string, threadSlug?: 
   const messages = await withApiTimeout(fetchChats(apiKey, workspaceSlug, threadSlug), "exportChats");
 
   if (messages.length === 0) {
-    return textResult(
-      `No chats found for workspace "${workspaceSlug}"${threadSlug ? ` / thread "${threadSlug}"` : ""}.`
-    );
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          `No chats found for workspace "${workspaceSlug}"${threadSlug ? ` / thread "${threadSlug}"` : ""}.`,
+          "Tell the user there are no chats to export from that workspace/thread."
+        ),
+      }],
+    };
   }
 
   await mkdir(SESSIONS_DIR, { recursive: true });
@@ -177,9 +200,15 @@ async function exportChats(apiKey: string, workspaceSlug?: string, threadSlug?: 
 
   await writeFile(filepath, md, "utf-8");
 
-  return textResult(
-    `Export completed!\n\n- Workspace: ${workspaceSlug}${threadSlug ? ` / Thread: ${threadSlug}` : ""}\n- Messages: ${messages.length}\n- Saved in: AnythingLLMSessions/${filename}`
-  );
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        `Export completed!\n\n- Workspace: ${workspaceSlug}${threadSlug ? ` / Thread: ${threadSlug}` : ""}\n- Messages: ${messages.length}\n- Saved in: AnythingLLMSessions/${filename}`,
+        "Acknowledge the export and where the file was saved."
+      ),
+    }],
+  };
 }
 
 async function exportAll(apiKey: string): Promise<any> {
@@ -225,11 +254,27 @@ async function exportAll(apiKey: string): Promise<any> {
     }
   }
 
-  if (results.length === 0) return textResult("No chats to export.");
+  if (results.length === 0) {
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          "No chats to export.",
+          "Acknowledge that there were no chats to export."
+        ),
+      }],
+    };
+  }
 
-  return textResult(
-    `Export complete!\n\n${results.join("\n")}\n\nTotal: ${results.length} files saved in AnythingLLMSessions/`
-  );
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        `Export complete!\n\n${results.join("\n")}\n\nTotal: ${results.length} files saved in AnythingLLMSessions/`,
+        "Acknowledge the bulk export and how many files were saved."
+      ),
+    }],
+  };
 }
 
 async function fetchWorkspaces(apiKey: string): Promise<Workspace[]> {

@@ -3,7 +3,9 @@ import { promisify } from "util";
 import { fileURLToPath } from "url";
 import { existsSync } from "fs";
 import { join, dirname } from "path";
-import { formatError, textResult, getPythonPath } from "../utils/helpers.js";
+import { formatError, getPythonPath } from "../utils/helpers.js";
+import { LIMITS } from "../utils/truncate.js";
+import { wrapWithInstruction, truncateSnippet } from "../utils/resultWrapper.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -93,10 +95,18 @@ async function ragSearch(args: RagArgs): Promise<any> {
   const formatted = parsed.results?.map((r: any, i: number) => {
     const distance = r.distance !== null ? ` (distance: ${r.distance.toFixed(3)})` : "";
     const meta = r.metadata ? ` [${Object.entries(r.metadata).map(([k, v]) => `${k}=${v}`).join(", ")}]` : "";
-    return `${i + 1}. ${r.text?.substring(0, 300)}${r.text?.length > 300 ? "..." : ""}${distance}${meta}`;
+    return `${i + 1}. ${truncateSnippet(r.text ?? "", LIMITS.ragChunk)}${distance}${meta}`;
   }).join("\n\n") || "No results found.";
 
-  return textResult(`🔍 RAG search "${args.query}" in "${args.collection}" (${parsed.results?.length || 0} results):\n\n${formatted}`);
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        `RAG search "${args.query}" in "${args.collection}" (${parsed.results?.length || 0} results):\n\n${formatted}`,
+        "Summarize the most relevant snippets. Cite by index and distance. Do not paste every chunk verbatim."
+      ),
+    }],
+  };
 }
 
 async function ragAdd(args: RagArgs): Promise<any> {
@@ -110,7 +120,15 @@ async function ragAdd(args: RagArgs): Promise<any> {
   const result = await runRag("add", cmdArgs);
   const parsed = JSON.parse(result);
 
-  return textResult(`✅ Added to "${parsed.collection}": id=${parsed.id} (total: ${parsed.chunks} documents)`);
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        `Added to "${parsed.collection}": id=${parsed.id} (total: ${parsed.chunks} documents)`,
+        "Acknowledge the add; do not echo the document back."
+      ),
+    }],
+  };
 }
 
 async function ragList(args: RagArgs): Promise<any> {
@@ -125,7 +143,15 @@ async function ragList(args: RagArgs): Promise<any> {
     return `${i + 1}. ${d.id}${meta}`;
   }).join("\n") || "Empty collection.";
 
-  return textResult(`📚 Collection "${parsed.collection}" (${parsed.count} documents):\n\n${formatted}`);
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        `Collection "${parsed.collection}" (${parsed.count} documents):\n\n${formatted}`,
+        "List the IDs compactly. Do not paste full metadata verbatim."
+      ),
+    }],
+  };
 }
 
 async function ragDelete(args: RagArgs): Promise<any> {
@@ -134,7 +160,15 @@ async function ragDelete(args: RagArgs): Promise<any> {
   const result = await runRag("delete", ["--collection", args.collection, "--id", args.id]);
   const parsed = JSON.parse(result);
 
-  return textResult(`🗑️ Deleted from "${parsed.collection}": ${parsed.id}`);
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        `Deleted from "${parsed.collection}": ${parsed.id}`,
+        "Acknowledge the deletion."
+      ),
+    }],
+  };
 }
 
 async function ragCollections(): Promise<any> {
@@ -143,7 +177,15 @@ async function ragCollections(): Promise<any> {
 
   const formatted = parsed.collections?.map((c: any) => `• ${c.name} (${c.count} documents)`).join("\n") || "No collections.";
 
-  return textResult(`📊 Collections ChromaDB:\n\n${formatted}`);
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        `Collections ChromaDB:\n\n${formatted}`,
+        "Briefly list collections and counts. The model can pick which to query next."
+      ),
+    }],
+  };
 }
 
 async function ragIngestSessions(args: RagArgs): Promise<any> {
@@ -158,5 +200,13 @@ async function ragIngestSessions(args: RagArgs): Promise<any> {
     windowsHide: true,
   });
 
-  return textResult(`📦 Sessions indexed into RAG:\n\n${stdout}${stderr ? `\nStderr: ${stderr}` : ""}`);
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        `Sessions indexed into RAG:\n\n${stdout}${stderr ? `\nStderr: ${stderr}` : ""}`,
+        "Briefly describe what was indexed. If there are errors, surface the first one."
+      ),
+    }],
+  };
 }

@@ -1,6 +1,8 @@
 import { readFile, writeFile, mkdir, readdir, stat } from "fs/promises";
 import { join, dirname, basename, extname, resolve } from "path";
 import { getWorkspaceRoot, textResult, formatError } from "../utils/helpers.js";
+import { LIMITS } from "../utils/truncate.js";
+import { wrapWithInstruction, truncateSnippet } from "../utils/resultWrapper.js";
 
 interface WikiArgs {
   action: "search" | "read" | "write" | "list";
@@ -74,14 +76,33 @@ async function searchWiki(query: string, maxResults: number): Promise<any> {
     }
 
     if (results.length === 0) {
-      return textResult(`No results found for "${query}" in the wiki.`);
+      return {
+        content: [{
+          type: "text",
+          text: wrapWithInstruction(
+            `No results found for "${query}" in the wiki.`,
+            "Tell the user no wiki pages matched and suggest alternate search terms."
+          ),
+        }],
+      };
     }
 
-    const formatted = results.map((r, i) =>
+    const formatted = results.map((r) => ({
+      ...r,
+      snippet: truncateSnippet(r.snippet, LIMITS.wikiSnippet),
+    })).map((r, i) =>
       `${i + 1}. **${r.title}** (${r.path})\n   ${r.snippet}\n   _Modified: ${r.modified}_`
     ).join("\n\n");
 
-    return textResult(`🔍 Results for "${query}" (${results.length} found):\n\n${formatted}`);
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          `Results for "${query}" (${results.length} found):\n\n${formatted}`,
+          "Report the matching pages briefly. Do NOT paste long snippets verbatim. Just give the user titles, paths, and a one-line summary each."
+        ),
+      }],
+    };
   } catch (error) {
     throw new Error(`Wiki search error: ${(error as Error).message}`);
   }
@@ -99,7 +120,16 @@ async function readWikiPage(pagePath: string): Promise<any> {
   try {
     const content = await readFile(fullPath, "utf-8");
     const stats = await stat(fullPath);
-    return textResult(`📄 ${cleanPath}\n_Modificato: ${stats.mtime.toISOString().split("T")[0]}_\n\n---\n\n${content}`);
+    const truncated = truncateSnippet(content, LIMITS.wikiBody);
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          `${cleanPath}\n_Modificato: ${stats.mtime.toISOString().split("T")[0]}_\n\n---\n\n${truncated}`,
+          "You have the wiki page content. Reference or quote from it as needed; do NOT restate the whole page back to the user."
+        ),
+      }],
+    };
   } catch {
     return {
       content: [{ type: "text", text: `Page not found: ${cleanPath}` }],
@@ -120,7 +150,15 @@ async function writeWikiPage(pagePath: string, content: string): Promise<any> {
   try {
     await mkdir(dirname(fullPath), { recursive: true });
     await writeFile(fullPath, content, "utf-8");
-    return textResult(`✅ Page saved: ${cleanPath}`);
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          `Page saved: ${cleanPath}`,
+          "Acknowledge the save. Do not echo the saved content back to the user."
+        ),
+      }],
+    };
   } catch (error) {
     throw new Error(`Wiki write error: ${(error as Error).message}`);
   }
@@ -140,7 +178,7 @@ async function listWikiPages(maxResults: number): Promise<any> {
         results.push({
           path: relativePath,
           title: extractTitle(content) || basename(pagePath, ".md"),
-          snippet: content.substring(0, 100).replace(/\n/g, " ") + "...",
+          snippet: truncateSnippet(content.substring(0, 100).replace(/\n/g, " "), LIMITS.wikiSnippet),
           modified: stats.mtime.toISOString().split("T")[0],
         });
       } catch {
@@ -149,7 +187,15 @@ async function listWikiPages(maxResults: number): Promise<any> {
     }
 
     const formatted = results.map((r, i) => `${i + 1}. **${r.title}** (${r.path}) - _${r.modified}_`).join("\n");
-    return textResult(`📚 Pages in the wiki (${results.length}/${pages.length} shown):\n\n${formatted}`);
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          `Pages in the wiki (${results.length}/${pages.length} shown):\n\n${formatted}`,
+          "Briefly list the wiki pages. Group by relevant category if obvious."
+        ),
+      }],
+    };
   } catch (error) {
     throw new Error(`Wiki list error: ${(error as Error).message}`);
   }

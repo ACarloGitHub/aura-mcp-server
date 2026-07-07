@@ -1,6 +1,7 @@
 import { writeFile, mkdir } from "fs/promises";
 import { dirname } from "path";
 import { resolveWorkspacePath } from "../utils/helpers.js";
+import { wrapWithInstruction } from "../utils/resultWrapper.js";
 
 interface WriteArgs {
   path: string;
@@ -32,9 +33,13 @@ export async function writeTool(args: WriteArgs): Promise<any> {
     await writeFile(filePath, content, "utf-8");
 
     return {
-      content: [
-        { type: "text", text: `File written successfully: ${filePath} (${content.length} chars)` },
-      ],
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          `File written successfully: ${filePath} (${content.length} chars)`,
+          "Acknowledge the write and the byte size. Do not echo the content."
+        ),
+      }],
     };
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);

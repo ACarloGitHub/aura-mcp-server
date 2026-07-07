@@ -1,5 +1,6 @@
 import { readdir, stat } from "fs/promises";
-import { resolveWorkspacePath, formatError, textResult } from "../utils/helpers.js";
+import { resolveWorkspacePath, formatError } from "../utils/helpers.js";
+import { wrapWithInstruction } from "../utils/resultWrapper.js";
 
 interface ListDirArgs {
   path?: string;
@@ -23,7 +24,15 @@ export async function listDirTool(args: ListDirArgs): Promise<any> {
       if (e.name.startsWith(".")) continue;
       e.isDirectory() ? dirs.push(`${e.name}/`) : files.push(e.name);
     }
-    return textResult(`Directory: ${dirPath}\nTotal: ${entries.length}\n\n📁 Directories:\n${dirs.sort().join("\n") || "(none)"}\n\n📄 Files:\n${files.sort().join("\n") || "(none)"}`);
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          `Directory: ${dirPath}\nTotal: ${entries.length}\n\nDirectories:\n${dirs.sort().join("\n") || "(none)"}\n\nFiles:\n${files.sort().join("\n") || "(none)"}`,
+          "Briefly summarize the directory contents. Highlight any subdirectories the model should care about."
+        ),
+      }],
+    };
   } catch (error) {
     return formatError(`Listing error: ${(error as Error).message}`);
   }

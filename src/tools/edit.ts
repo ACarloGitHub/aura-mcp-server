@@ -1,5 +1,6 @@
 import { readFile, writeFile } from "fs/promises";
-import { resolveWorkspacePath, formatError, textResult } from "../utils/helpers.js";
+import { resolveWorkspacePath, formatError } from "../utils/helpers.js";
+import { wrapWithInstruction } from "../utils/resultWrapper.js";
 
 interface EditArgs {
   path?: string;
@@ -37,7 +38,15 @@ export async function editTool(args: EditArgs): Promise<any> {
       return formatError("No changes made");
     }
     await writeFile(filePath, updated, "utf-8");
-    return textResult(`File modified: ${filePath}`);
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          `File modified: ${filePath}`,
+          "Acknowledge the edit. Show the replaced region briefly if useful."
+        ),
+      }],
+    };
   } catch (error) {
     return formatError(`Edit error: ${(error as Error).message}`);
   }

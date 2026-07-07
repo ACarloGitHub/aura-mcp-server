@@ -1,6 +1,7 @@
 import { readFile, writeFile, readdir, mkdir, appendFile } from "fs/promises";
 import { join, resolve, dirname } from "path";
 import { getWorkspaceRoot, textResult, formatError } from "../utils/helpers.js";
+import { wrapWithInstruction } from "../utils/resultWrapper.js";
 
 interface CompactArgs {
   action: "memory" | "status" | "list";
@@ -40,12 +41,28 @@ async function memoryCompact(args: CompactArgs): Promise<any> {
   try {
     content = await readFile(memoryPath, "utf-8");
   } catch {
-    return textResult("MEMORY.md not found. Nothing to compact.");
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          "MEMORY.md not found. Nothing to compact.",
+          "Acknowledge that there is nothing to compact."
+        ),
+      }],
+    };
   }
 
   const lines = content.split("\n");
   if (lines.length <= threshold) {
-    return textResult(`MEMORY.md: ${lines.length} lines (threshold: ${threshold}). Compaction not needed.`);
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          `MEMORY.md: ${lines.length} lines (threshold: ${threshold}). Compaction not needed.`,
+          "Acknowledge that compaction is not needed yet and report the current line count."
+        ),
+      }],
+    };
   }
 
   const noteIdx = lines.findIndex((l) => /^##\s+Notes?\b/i.test(l));
@@ -75,9 +92,15 @@ async function memoryCompact(args: CompactArgs): Promise<any> {
   await writeFile(memoryPath, compacted, "utf-8");
 
   const newLines = compacted.split("\n").length;
-  return textResult(
-    `Memory compacted!\n- ${lines.length} lines → ${newLines} lines\n- Archived in memory-archive.md\n- Date: ${timestamp}`
-  );
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        `Memory compacted!\n- ${lines.length} lines → ${newLines} lines\n- Archived in memory-archive.md\n- Date: ${timestamp}`,
+        "Confirm the compaction result and where the archive went."
+      ),
+    }],
+  };
 }
 
 async function compactStatus(_args: CompactArgs): Promise<any> {
@@ -113,7 +136,15 @@ async function compactStatus(_args: CompactArgs): Promise<any> {
     results.push("compacted-sessions/: empty or does not exist");
   }
 
-  return textResult(results.join("\n"));
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        results.join("\n"),
+        "Briefly summarize memory status. If compaction is recommended, mention it explicitly."
+      ),
+    }],
+  };
 }
 
 async function listCompacted(): Promise<any> {
@@ -121,11 +152,37 @@ async function listCompacted(): Promise<any> {
     const files = await readdir(COMPACTED_DIR());
     const mdFiles = files.filter((f) => f.endsWith(".md")).sort().reverse();
 
-    if (mdFiles.length === 0) return textResult("No compacted sessions.");
+    if (mdFiles.length === 0) {
+      return {
+        content: [{
+          type: "text",
+          text: wrapWithInstruction(
+            "No compacted sessions.",
+            "Acknowledge the empty list."
+          ),
+        }],
+      };
+    }
 
     const list = mdFiles.map((f, i) => `${i + 1}. ${f.replace(".md", "")}`).join("\n");
-    return textResult(`Compacted sessions:\n\n${list}`);
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          `Compacted sessions:\n\n${list}`,
+          "List compacted session filenames briefly. The user can pick one to read."
+        ),
+      }],
+    };
   } catch {
-    return textResult("compacted-sessions/ directory not found.");
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          "compacted-sessions/ directory not found.",
+          "Acknowledge the missing directory."
+        ),
+      }],
+    };
   }
 }

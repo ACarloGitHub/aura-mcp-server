@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir, readdir, appendFile, stat } from "fs/promises";
 import { join, dirname, basename, resolve } from "path";
-import { getWorkspaceRoot, textResult, formatError } from "../utils/helpers.js";
+import { getWorkspaceRoot, formatError } from "../utils/helpers.js";
+import { wrapWithInstruction } from "../utils/resultWrapper.js";
 
 interface WikiIngestArgs {
   action: "ingest" | "query" | "lint" | "update_index" | "update_log";
@@ -54,17 +55,23 @@ async function wikiIngest(args: WikiIngestArgs): Promise<any> {
 
   const fileName = basename(sourcePath, sourcePath.endsWith(".txt") ? ".txt" : ".md");
 
-  return textResult(
-    `📖 Content of "${fileName}" loaded (${content.length} characters).\n\n` +
-    `Now you need to:\n` +
-    `1. Create a summary in wiki/summaries/${fileName}.md\n` +
-    `2. Identify concepts and create pages in wiki/concepts/\n` +
-    `3. Identify entities and create pages in wiki/entities/\n` +
-    `4. Add cross-links between pages\n` +
-    `5. Update wiki/index.md\n` +
-    `6. Update wiki/log.md\n\n` +
-    `The content is ready for your analysis.`
-  );
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        `Content of "${fileName}" loaded (${content.length} characters).\n\n` +
+        `Now you need to:\n` +
+        `1. Create a summary in wiki/summaries/${fileName}.md\n` +
+        `2. Identify concepts and create pages in wiki/concepts/\n` +
+        `3. Identify entities and create pages in wiki/entities/\n` +
+        `4. Add cross-links between pages\n` +
+        `5. Update wiki/index.md\n` +
+        `6. Update wiki/log.md\n\n` +
+        `The content is ready for your analysis.`,
+        "Process the loaded content per the embedded instructions."
+      ),
+    }],
+  };
 }
 
 async function wikiQuery(args: WikiIngestArgs): Promise<any> {
@@ -74,12 +81,26 @@ async function wikiQuery(args: WikiIngestArgs): Promise<any> {
   try {
     indexContent = await readFile(INDEX_PATH(), "utf-8");
   } catch {
-    return textResult("Index not found. The wiki may be empty.");
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          "Index not found. The wiki may be empty.",
+          "Acknowledge that the wiki index is missing."
+        ),
+      }],
+    };
   }
 
-  return textResult(
-    `Wiki index loaded. Use wiki search/read to find relevant pages for: "${args.query_text}"\n\n${indexContent.substring(0, 2000)}`
-  );
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        `Wiki index loaded. Use wiki search/read to find relevant pages for: "${args.query_text}"\n\n${indexContent.substring(0, 2000)}`,
+        "Use the index to locate relevant pages via wiki search/read."
+      ),
+    }],
+  };
 }
 
 async function wikiLint(): Promise<any> {
@@ -123,7 +144,15 @@ async function wikiLint(): Promise<any> {
     ? "✅ Wiki is healthy! No issues found."
     : `⚠️ Found ${issues.length} issues:\n\n${issues.map((i, idx) => `${idx + 1}. ${i}`).join("\n")}`;
 
-  return textResult(`🔍 Wiki Lint Report\n\n${report}\n\nTotal pages: ${pages.length}`);
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        `Wiki Lint Report\n\n${report}\n\nTotal pages: ${pages.length}`,
+        "Briefly summarize the lint findings; if there are issues, group them by severity. Do not paste every issue verbatim."
+      ),
+    }],
+  };
 }
 
 async function wikiUpdateIndex(): Promise<any> {
@@ -180,7 +209,15 @@ async function wikiUpdateIndex(): Promise<any> {
 
   await writeFile(INDEX_PATH(), indexContent, "utf-8");
 
-  return textResult(`📋 Index updated with ${pages.length} pages.`);
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        `Index updated with ${pages.length} pages.`,
+        "Confirm the index was rebuilt and note how many pages it covers."
+      ),
+    }],
+  };
 }
 
 async function wikiUpdateLog(args: WikiIngestArgs): Promise<any> {
@@ -189,11 +226,27 @@ async function wikiUpdateLog(args: WikiIngestArgs): Promise<any> {
 
   try {
     await appendFile(LOG_PATH(), logEntry, "utf-8");
-    return textResult(`📝 Log aggiornato: ${entry}`);
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          `Log updated: ${entry}`,
+          "Confirm the log entry was added."
+        ),
+      }],
+    };
   } catch {
     const newLog = `# Wiki Log\n\n_Wiki operations_\n${logEntry}`;
     await writeFile(LOG_PATH(), newLog, "utf-8");
-    return textResult(`📝 Log creato e aggiornato: ${entry}`);
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          `Log created and updated: ${entry}`,
+          "Confirm the new log entry was created."
+        ),
+      }],
+    };
   }
 }
 

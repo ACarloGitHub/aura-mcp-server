@@ -1,6 +1,9 @@
 // webSearch.ts — Web search via DuckDuckGo (lite POST) and Brave API
 // DuckDuckGo often blocks bot requests; we use /lite/ with POST + browser headers
 
+import { LIMITS } from "../utils/truncate.js";
+import { wrapWithInstruction, truncateSnippet } from "../utils/resultWrapper.js";
+
 interface WebSearchArgs {
   query: string;
   count?: number;
@@ -82,7 +85,13 @@ async function searchDuckDuckGoLite(query: string, count: number): Promise<any> 
 
   if (results.length === 0) {
     return {
-      content: [{ type: "text", text: `No results found for "${query}".` }],
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          `No results found for "${query}".`,
+          "Tell the user that no results were found and suggest alternative search terms."
+        ),
+      }],
     };
   }
 
@@ -158,15 +167,28 @@ function stripHtml(html: string): string {
 function formatResults(query: string, results: SearchResult[], source: string): any {
   if (results.length === 0) {
     return {
-      content: [{ type: "text", text: `No results found for "${query}" on ${source}.` }],
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          `No results found for "${query}" on ${source}.`,
+          "Tell the user that no results were found and suggest alternative search terms."
+        ),
+      }],
     };
   }
 
-  const formatted = results
+  const trimmed = results.map((r) => ({ ...r, description: truncateSnippet(r.description, LIMITS.webSnippet) }));
+  const formatted = trimmed
     .map((result, index) => `${index + 1}. **${result.title}**\n   URL: ${result.url}\n   ${result.description}`)
     .join("\n\n");
 
   return {
-    content: [{ type: "text", text: `Results for: "${query}" (via ${source}, ${results.length} results)\n\n${formatted}` }],
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        `Results for: "${query}" (via ${source}, ${results.length} results)\n\n${formatted}`,
+        "Summarize the most relevant 2-3 results for the user. Do NOT list all results verbatim. Pick the most relevant ones and describe them briefly in your own words."
+      ),
+    }],
   };
 }

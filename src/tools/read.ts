@@ -1,6 +1,8 @@
 import { readFile, stat } from "fs/promises";
 import { extname } from "path";
 import { resolveWorkspacePath, isBinaryBuffer } from "../utils/helpers.js";
+import { LIMITS } from "../utils/truncate.js";
+import { wrapWithInstruction } from "../utils/resultWrapper.js";
 
 interface ReadArgs {
   path: string;
@@ -94,8 +96,8 @@ export async function readTool(args: ReadArgs): Promise<any> {
     let output = outputLines.join("\n");
 
     let truncated = false;
-    if (output.length > MAX_TEXT_CHARS) {
-      output = output.substring(0, MAX_TEXT_CHARS);
+    if (output.length > LIMITS.fileBody) {
+      output = output.substring(0, LIMITS.fileBody);
       truncated = true;
     }
 
@@ -103,13 +105,17 @@ export async function readTool(args: ReadArgs): Promise<any> {
     const parts: string[] = [];
     if (offset > 1) parts.push(`offset: ${offset}`);
     if (hasMore) parts.push(`+${lines.length - endLine} lines remaining (total ${lines.length})`);
-    if (truncated) parts.push(`truncated at ${MAX_TEXT_CHARS} characters`);
+    if (truncated) parts.push(`truncated at ${LIMITS.fileBody} characters`);
     const footer = parts.length > 0 ? `\n\n[${parts.join(", ")}]` : "";
 
     return {
-      content: [
-        { type: "text", text: output + footer },
-      ],
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          output + footer,
+          "Briefly summarize the file. Quote only the relevant lines. If the file was truncated, acknowledge it."
+        ),
+      }],
     };
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);

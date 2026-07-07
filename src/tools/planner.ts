@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir, readdir, unlink, stat } from "fs/promises";
 import { join, resolve, basename } from "path";
 import { getWorkspaceRoot, textResult, formatError } from "../utils/helpers.js";
+import { wrapWithInstruction } from "../utils/resultWrapper.js";
 
 interface PlannerArgs {
   action: "create" | "read" | "list" | "update" | "delete" | "next" | "status";
@@ -57,7 +58,15 @@ async function createPlan(name: string, content: string): Promise<any> {
   await mkdir(plansDir, { recursive: true });
   await writeFile(filePath, content, "utf-8");
 
-  return textResult(`Plan created: ${name}.md`);
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        `Plan created: ${name}.md`,
+        "Acknowledge the plan was saved. Do NOT repeat the plan content back to the user."
+      ),
+    }],
+  };
 }
 
 async function readPlan(name: string): Promise<any> {
@@ -70,7 +79,15 @@ async function readPlan(name: string): Promise<any> {
 
   try {
     const content = await readFile(filePath, "utf-8");
-    return textResult(content);
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          content,
+          "Loaded the plan content. Do NOT repeat it; summarize tasks in 1-2 sentences."
+        ),
+      }],
+    };
   } catch {
     return { content: [{ type: "text", text: `Plan not found: ${name}` }], isError: true };
   }
@@ -82,11 +99,31 @@ async function listPlans(): Promise<any> {
     const entries = await readdir(plansDir, { withFileTypes: true });
     const plans = entries.filter((e) => e.isFile() && e.name.endsWith(".md")).map((e) => basename(e.name, ".md"));
 
-    if (plans.length === 0) return textResult("No plans found.");
+    if (plans.length === 0) {
+      return {
+        content: [{
+          type: "text",
+          text: wrapWithInstruction("No plans found.", "Acknowledge the empty plan list briefly."),
+        }],
+      };
+    }
 
-    return textResult(`Plans:\n\n${plans.map((p, i) => `${i + 1}. ${p}`).join("\n")}`);
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          `Plans:\n\n${plans.map((p, i) => `${i + 1}. ${p}`).join("\n")}`,
+          "Briefly list the plans (names only); do not paraphrase each."
+        ),
+      }],
+    };
   } catch {
-    return textResult("No plans found.");
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction("No plans found.", "Acknowledge the empty plan list briefly."),
+      }],
+    };
   }
 }
 
@@ -99,7 +136,15 @@ async function updatePlan(name: string, content: string): Promise<any> {
   }
 
   await writeFile(filePath, content, "utf-8");
-  return textResult(`Plan updated: ${name}.md`);
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        `Plan updated: ${name}.md`,
+        "Acknowledge the update; do not echo the new content back."
+      ),
+    }],
+  };
 }
 
 async function deletePlan(name: string): Promise<any> {
@@ -112,7 +157,15 @@ async function deletePlan(name: string): Promise<any> {
 
   try {
     await unlink(filePath);
-    return textResult(`Plan deleted: ${name}.md`);
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          `Plan deleted: ${name}.md`,
+          "Acknowledge the deletion."
+        ),
+      }],
+    };
   } catch {
     return { content: [{ type: "text", text: `Plan not found: ${name}` }], isError: true };
   }
@@ -178,11 +231,27 @@ async function nextStep(name: string, answer: string | undefined): Promise<any> 
         return formatError(new Error(`Error writing plan while recording answer: ${e instanceof Error ? e.message : String(e)}`));
       }
 
-      return textResult(`Answer recorded for "${questionText}"\n\nNext: ${findNextTask(updated)}`);
+      return {
+        content: [{
+          type: "text",
+          text: wrapWithInstruction(
+            `Answer recorded for "${questionText}"\n\nNext: ${findNextTask(updated)}`,
+            "Do NOT list all tasks. Reply with ONE sentence acknowledging the answer and the next step."
+          ),
+        }],
+      };
     }
 
     if (questionStartIndex >= 0 && !answer) {
-      return textResult(`Blocking question: "${questionText}"\n\nAnswer with planner action=next and the answer parameter.`);
+      return {
+        content: [{
+          type: "text",
+          text: wrapWithInstruction(
+            `Blocking question: "${questionText}"\n\nAnswer with planner action=next and the answer parameter.`,
+            "Ask the user the blocking question verbatim (you may paraphrase for clarity) and stop. Do not list other tasks."
+          ),
+        }],
+      };
     }
 
     // No question: plan completed
@@ -192,7 +261,15 @@ async function nextStep(name: string, answer: string | undefined): Promise<any> 
     } catch (e) {
       return formatError(new Error(`Error writing plan in completed state: ${e instanceof Error ? e.message : String(e)}`));
     }
-    return textResult("Plan completed!");
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          "Plan completed!",
+          "The plan finished. Reply with a single celebratory sentence."
+        ),
+      }],
+    };
   }
 
   // Mark the first task as completed
@@ -205,7 +282,15 @@ async function nextStep(name: string, answer: string | undefined): Promise<any> 
     return formatError(new Error(`Error writing plan while completing task: ${e instanceof Error ? e.message : String(e)}`));
   }
 
-  return textResult(`Completed: ${taskText}\n\nNext: ${findNextTask(updated)}`);
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        `Completed: ${taskText}\n\nNext: ${findNextTask(updated)}`,
+        "Do NOT list all tasks. Reply with ONE sentence about what was just completed and what comes next."
+      ),
+    }],
+  };
 }
 
 function findNextTask(content: string): string {
@@ -269,5 +354,13 @@ async function planStatus(name: string): Promise<any> {
     statusText += `\nActive blocking question: "${blockingQuestion}"`;
   }
 
-  return textResult(statusText);
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        statusText,
+        "Do NOT repeat the plan content or list all tasks. Summarize progress in 1-2 sentences: percent complete, remaining count, and any blocking question."
+      ),
+    }],
+  };
 }

@@ -1,6 +1,8 @@
 import { spawn, SpawnOptions } from "child_process";
 import { mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from "fs";
 import { join } from "path";
+import { wrapWithInstruction } from "../utils/resultWrapper.js";
+import { LIMITS } from "../utils/truncate.js";
 
 interface ExecArgs {
   command: string;
@@ -76,7 +78,13 @@ export async function execTool(args: ExecArgs): Promise<any> {
     child.on("error", (err) => { jobData.running = false; jobData.exitCode = -1; jobData.stderr += `\n[Error: ${err.message}]`; saveJob(); });
 
     return {
-      content: [{ type: "text", text: `Command started in background (sessionId: ${sessionId}, pid: ${child.pid || "N/A"})` }],
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          `Command started in background (sessionId: ${sessionId}, pid: ${child.pid || "N/A"})`,
+          "Tell the user the background job started and how to poll or kill it."
+        ),
+      }],
     };
   }
 
@@ -123,22 +131,58 @@ export async function execTool(args: ExecArgs): Promise<any> {
       clearTimeout(timeoutId);
       if (timedOut) {
         resolve({
-          content: [{ type: "text", text: `Timeout after ${clampedTimeout}s\n\nStdout:\n${truncate(stdout)}\n\nStderr:\n${truncate(stderr)}` }],
+          content: [{
+            type: "text",
+            text: wrapWithInstruction(
+              `Timeout after ${clampedTimeout}s\n\nStdout:\n${truncate(stdout)}\n\nStderr:\n${truncate(stderr)}`,
+              "Condense the output for the user. Note the timeout, and if the output is huge just report what fits in context."
+            ),
+          }],
           isError: true,
         });
         return;
       }
       if (killed) {
         resolve({
-          content: [{ type: "text", text: `Excessive output (max ${MAX_OUTPUT_CHARS} chars).\n\nStdout:\n${truncate(stdout)}\n\nStderr:\n${truncate(stderr)}` }],
+          content: [{
+            type: "text",
+            text: wrapWithInstruction(
+              `Excessive output (max ${LIMITS.execOutput} chars).\n\nStdout:\n${truncate(stdout)}\n\nStderr:\n${truncate(stderr)}`,
+              "Output exceeded the limit and was truncated. Tell the user which command produced too much output and suggest redirecting to a file."
+            ),
+          }],
           isError: true,
         });
         return;
       }
       const output: any[] = [];
-      if (stdout) output.push({ type: "text", text: truncate(stdout) });
-      if (stderr) output.push({ type: "text", text: `Stderr:\n${truncate(stderr)}` });
-      if (output.length === 0) output.push({ type: "text", text: `Completed (exit: ${code}, signal: ${signal || "none"})` });
+      if (stdout) {
+        output.push({
+          type: "text",
+          text: wrapWithInstruction(
+            truncate(stdout),
+            "Condense the output for the user. Highlight errors and significant results."
+          ),
+        });
+      }
+      if (stderr) {
+        output.push({
+          type: "text",
+          text: wrapWithInstruction(
+            `Stderr:\n${truncate(stderr)}`,
+            "Surface any non-trivial stderr output. If it is benign, you may ignore it."
+          ),
+        });
+      }
+      if (output.length === 0) {
+        output.push({
+          type: "text",
+          text: wrapWithInstruction(
+            `Completed (exit: ${code}, signal: ${signal || "none"})`,
+            "Acknowledge that the command finished. If non-zero, report the exit code."
+          ),
+        });
+      }
       resolve({ content: output, isError: code !== 0 && code !== null });
     });
 
@@ -165,7 +209,13 @@ export async function execPollTool(args: { jobId: string; tail?: number }): Prom
   const tailStderr = job.stderr ? (job.stderr as string).split("\n").slice(-tail).join("\n") : "(empty)";
   const status = job.running ? "[STILL RUNNING]" : `[COMPLETED] exitCode: ${job.exitCode}`;
   return {
-    content: [{ type: "text", text: `${status}\npid: ${job.pid}\ncommand: ${job.command}\nstartedAt: ${job.startedAt}\n\n--- Stdout (last ${tail} lines) ---\n${tailStdout}\n\n--- Stderr (last ${tail} lines) ---\n${tailStderr}` }],
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        `${status}\npid: ${job.pid}\ncommand: ${job.command}\nstartedAt: ${job.startedAt}\n\n--- Stdout (last ${tail} lines) ---\n${tailStdout}\n\n--- Stderr (last ${tail} lines) ---\n${tailStderr}`,
+        "Condense the tailed output. Highlight what changed since the last poll."
+      ),
+    }],
   };
 }
 
@@ -181,14 +231,30 @@ export async function execKillTool(args: { jobId: string }): Promise<any> {
     return { content: [{ type: "text", text: `Corrupted job file: ${args.jobId}` }], isError: true };
   }
   if (!job.running) {
-    return { content: [{ type: "text", text: `Job ${args.jobId} already terminated (exitCode: ${job.exitCode})` }] };
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          `Job ${args.jobId} already terminated (exitCode: ${job.exitCode})`,
+          "Acknowledge that the job was already terminated."
+        ),
+      }],
+    };
   }
   try { process.kill(job.pid, "SIGTERM"); } catch {
     try { process.kill(job.pid); } catch (e) {
       return { content: [{ type: "text", text: `Unable to kill pid ${job.pid}: ${String(e)}` }], isError: true };
     }
   }
-  return { content: [{ type: "text", text: `SIGTERM sent to pid ${job.pid} (job: ${args.jobId})` }] };
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        `SIGTERM sent to pid ${job.pid} (job: ${args.jobId})`,
+        "Acknowledge the kill."
+      ),
+    }],
+  };
 }
 
 export async function execListTool(): Promise<any> {
@@ -197,10 +263,26 @@ export async function execListTool(): Promise<any> {
   try {
     entries = (readdirSync(bgDir) as string[]).filter((f) => f.endsWith(".json"));
   } catch {
-    return { content: [{ type: "text", text: "No jobs found (bg-jobs/ empty or missing)." }] };
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          "No jobs found (bg-jobs/ empty or missing).",
+          "Acknowledge the empty list."
+        ),
+      }],
+    };
   }
   if (entries.length === 0) {
-    return { content: [{ type: "text", text: "No jobs found." }] };
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          "No jobs found.",
+          "Acknowledge the empty list."
+        ),
+      }],
+    };
   }
   const rows = entries.map((f) => {
     const jobId = f.replace(".json", "");
@@ -213,7 +295,15 @@ export async function execListTool(): Promise<any> {
       return `${jobId}  [corrupted file]`;
     }
   });
-  return { content: [{ type: "text", text: `Background jobs:\n\n${rows.join("\n")}` }] };
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        `Background jobs:\n\n${rows.join("\n")}`,
+        "Briefly list jobs with state (running/completed). Avoid dumping long commands."
+      ),
+    }],
+  };
 }
 
 export async function execCleanTool(args: { maxAgeHours?: number; all?: boolean }): Promise<any> {
@@ -224,7 +314,15 @@ export async function execCleanTool(args: { maxAgeHours?: number; all?: boolean 
   try {
     entries = (readdirSync(bgDir) as string[]).filter((f) => f.endsWith(".json"));
   } catch {
-    return { content: [{ type: "text", text: "No jobs to clean." }] };
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          "No jobs to clean.",
+          "Acknowledge that there was nothing to clean."
+        ),
+      }],
+    };
   }
   const deleted: string[] = [];
   const skipped: string[] = [];
@@ -246,10 +344,18 @@ export async function execCleanTool(args: { maxAgeHours?: number; all?: boolean 
   const lines = [`Deleted: ${deleted.length} job(s).`];
   if (deleted.length > 0) lines.push(deleted.map((id) => `  - ${id}`).join("\n"));
   if (skipped.length > 0) lines.push(`Skipped (running or recent): ${skipped.length}`);
-  return { content: [{ type: "text", text: lines.join("\n") }] };
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        lines.join("\n"),
+        "Acknowledge the cleanup result."
+      ),
+    }],
+  };
 }
 
 function truncate(text: string): string {
-  if (text.length <= MAX_OUTPUT_CHARS) return text;
-  return text.substring(0, MAX_OUTPUT_CHARS) + `\n\n[...truncated: ${text.length} chars total]`;
+  if (text.length <= LIMITS.execOutput) return text;
+  return text.substring(0, LIMITS.execOutput) + `\n\n[...truncated: ${text.length} chars total]`;
 }
