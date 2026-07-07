@@ -32,14 +32,13 @@ A powerful [MCP](https://modelcontextprotocol.io) server for [AnythingLLM](https
 | 🔎 **RAG** | Semantic search via ChromaDB over sessions and auto-extracted entities. |
 | 💬 **AnythingLLM** | Export chat sessions directly from AnythingLLM API. |
 | 🔔 **Notifications** | Desktop notifications + beep when the agent completes tasks (Windows/Linux/macOS). |
-| 🛠️ **13 Built-in Tools** | `exec`, `read`, `write`, `edit`, `list_dir`, `web_search`, `wiki`, `wiki_ingest`, `rag`, `planner`, `compact`, `anythingllm`, `notify`. |
+| 🛠️ **11 Built-in Tools** | `file`, `exec`, `exec_job`, `web_search`, `wiki`, `wiki_ingest`, `rag`, `planner`, `compact`, `anythingllm`, `notify`. |
 
 ## Requirements
 
 - **Node.js** 18+
 - **AnythingLLM** or **LM Studio** 0.3+ (with MCP support)
-- **Python 3** with `chromadb` (for RAG only — optional)
-- **Ollama** with `nomic-embed-text` model (for RAG embeddings — optional)
+- **Python 3** with `chromadb` (for RAG only — optional, included via setup)
 
 ## Quick Start
 
@@ -103,41 +102,27 @@ Get your key from AnythingLLM → Settings → API Keys.
 
 You can also set it via environment variable: `ANYTHINGLLM_API_KEY=your-key`.
 
-### RAG Setup (optional)
+### RAG Setup
 
-For semantic search, install the Python dependency:
+RAG runs locally with `nomic-embed-text` via `llama.cpp` (CPU-only, no CUDA required). The setup script (`install.bat` / `install.sh`) provisions both a venv with `chromadb` and a vendored `llama.cpp` runtime plus the embedding model into the project directory — nothing leaves the machine.
 
-```bash
-pip install chromadb
-```
-
-Then install [Ollama](https://ollama.com) and pull the embedding model:
-
-```bash
-ollama pull nomic-embed-text
-```
-
-Make sure Ollama is running (`ollama serve`) before using RAG tools. The RAG engine calls Ollama's local API for embeddings — no cloud required.
+After the first install no further setup is needed; the server picks up `embeddings/nomic-embed-text-vX.X.X-GGUF.gguf` automatically.
 
 ## Tools
 
 | Tool | What it does |
 |------|-------------|
-| `exec` | Run shell commands (timeout, background jobs, workdir, env) |
-| `read` | Read text files or images (jpg, png, gif, webp) |
-| `write` | Write files, auto-creates parent directories |
-| `edit` | Edit existing files with find-and-replace (multi-param support) |
-| `list_dir` | List directory contents, skips hidden files |
-| `web_search` | Search via DuckDuckGo (free) or Brave API |
-| `wiki` | Search, read, write, list wiki pages |
-| `wiki_ingest` | Advanced wiki management (ingest, lint, update index) |
-| `rag` | Semantic search (ChromaDB + Ollama embeddings) |
-| `planner` | Create and execute phased plans with blocking questions |
-| `compact` | Memory compaction + session archiving |
-| `anythingllm` | Export chat sessions from AnythingLLM API (list/export/export-all) |
-| `notify` | Desktop notification + beep when tasks complete |
-
-AnythingLLM compatibility aliases are also registered: `filesystem-read-text-file`, `filesystem-write-text-file`, `filesystem-edit-text-file`, `filesystem-list-directory`.
+| `file` | Read, write, edit, or list a file in the workspace. |
+| `exec` | Run shell commands (timeout, background jobs, workdir, env). |
+| `exec_job` | Manage a background exec job (poll, kill, list, clean). |
+| `web_search` | Web search via DuckDuckGo. |
+| `wiki` | Manage the local wiki (search, read, write, list). |
+| `wiki_ingest` | Advanced wiki ingest, lint, index updates. |
+| `rag` | Semantic search using `nomic-embed-text` over ChromaDB collections. |
+| `planner` | Create and execute phased plans with blocking questions. |
+| `compact` | Memory compaction + session archiving. |
+| `anythingllm` | Export chat sessions from AnythingLLM API. |
+| `notify` | Desktop notification + beep when tasks complete. |
 
 ## Environment Variables
 
@@ -145,12 +130,11 @@ AnythingLLM compatibility aliases are also registered: `filesystem-read-text-fil
 |----------|---------|-------------|
 | `AGENT_WORKSPACE` | server dir | Working directory. All file ops scoped here. |
 | `ANYTHINGLLM_API_KEY` | — | AnythingLLM API key (or use `api-key.json`) |
-| `BRAVE_API_KEY` | — | Optional Brave Search API key |
 | `RAG_PYTHON_PATH` | auto-detected | Python executable with chromadb installed |
 | `LM_STUDIO_CONVERSATIONS_DIR` | `~/.lmstudio/conversations` | LM Studio sessions directory |
 | `CHROMA_DATA_DIR` | `{server_dir}/rag/chroma_data` | ChromaDB persistence directory |
-| `OLLAMA_EMBED_URL` | `http://localhost:11434/api/embeddings` | Ollama embeddings API endpoint |
-| `OLLAMA_EMBED_MODEL` | `nomic-embed-text` | Ollama model used for embeddings |
+| `LLAMACPP_BIN` | `{server_dir}/vendor/llama.cpp/build/bin/llama-embedding` | Path to the llama.cpp embedding binary. |
+| `EMBEDDINGS_DIR` | `{server_dir}/embeddings` | Directory containing the GGUF model. |
 | `MCP_DEBUG` | — | Set to `1` for verbose debug logging |
 
 ## Project Structure
@@ -166,16 +150,10 @@ aura-mcp-server/
 ├── lm-studio-config.example.json  # MCP config template
 ├── install.bat / install.sh # Setup scripts
 ├── start.bat / start.sh     # Launch scripts
-├── src/tools/               # 13 tool implementations
+├── src/tools/               # 11 tool implementations in 7 consolidated files
 ├── wiki-template/           # Empty wiki scaffolding (copy to your workspace)
-├── docs/                    # Detailed docs
-│   ├── setup.md
-│   ├── first-boot.md
-│   ├── architecture.md
-│   ├── wiki.md
-│   ├── planner.md
-│   ├── compaction.md
-│   └── env-vars.md
+├── rag/                     # ChromaDB persistence (created on first use)
+├── documentation/           # Detailed docs (committed)
 ├── package.json
 ├── tsconfig.json
 └── LICENSE (MIT)

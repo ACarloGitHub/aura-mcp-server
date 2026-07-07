@@ -1,5 +1,5 @@
-// webSearch.ts — Web search via DuckDuckGo (lite POST) and Brave API
-// DuckDuckGo often blocks bot requests; we use /lite/ with POST + browser headers
+// webSearch.ts — Web search via DuckDuckGo Lite (POST)
+// DuckDuckGo often blocks bot requests; we use /lite/ with POST + browser headers.
 
 import { LIMITS } from "../utils/truncate.js";
 import { wrapWithInstruction, truncateSnippet } from "../utils/resultWrapper.js";
@@ -7,7 +7,6 @@ import { wrapWithInstruction, truncateSnippet } from "../utils/resultWrapper.js"
 interface WebSearchArgs {
   query: string;
   count?: number;
-  engine?: "brave" | "duckduckgo";
 }
 
 interface SearchResult {
@@ -29,16 +28,8 @@ const DDG_HEADERS = {
 };
 
 export async function webSearchTool(args: WebSearchArgs): Promise<any> {
-  const { query, count = 5, engine = "duckduckgo" } = args;
+  const { query, count = 5 } = args;
   const limit = Math.min(Math.max(count, 1), MAX_RESULTS);
-
-  const braveApiKey = process.env.BRAVE_API_KEY;
-
-  if (engine === "brave" && braveApiKey) {
-    const result = await withTimeout(searchBrave(query, limit, braveApiKey), SEARCH_TIMEOUT_MS, "Brave search timeout");
-    if (!result.isError) return result;
-    console.error("Brave search failed, fallback to DuckDuckGo");
-  }
 
   return await withTimeout(searchDuckDuckGoLite(query, limit), SEARCH_TIMEOUT_MS, "DuckDuckGo search timeout");
 }
@@ -95,14 +86,12 @@ async function searchDuckDuckGoLite(query: string, count: number): Promise<any> 
     };
   }
 
-  return formatResults(query, results, "DuckDuckGo");
+  return formatResults(query, results);
 }
 
 function parseDuckDuckGoLiteHTML(html: string, maxResults: number): SearchResult[] {
   const results: SearchResult[] = [];
 
-  // DDG lite: each result = a <tr> block
-  // More robust extraction using split on markers
   const rows = html.split(/<tr\b[^>]*>/i);
 
   for (const row of rows) {
@@ -123,36 +112,6 @@ function parseDuckDuckGoLiteHTML(html: string, maxResults: number): SearchResult
   return results;
 }
 
-// ============== Brave (API key required) ==============
-async function searchBrave(query: string, count: number, apiKey: string): Promise<any> {
-  const url = new URL("https://api.search.brave.com/res/v1/web/search");
-  url.searchParams.append("q", query);
-  url.searchParams.append("count", String(count));
-  url.searchParams.append("offset", "0");
-
-  const response = await fetch(url.toString(), {
-    method: "GET",
-    headers: {
-      "Accept": "application/json",
-      "X-Subscription-Token": apiKey,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  const results: SearchResult[] = (data.web?.results || []).map((r: any) => ({
-    title: r.title || "Untitled",
-    url: r.url || "",
-    description: r.description || "",
-  }));
-
-  return formatResults(query, results.slice(0, count), "Brave");
-}
-
-// ============== Helper ==============
 function stripHtml(html: string): string {
   return html
     .replace(/<[^>]*>/g, "")
@@ -164,25 +123,7 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-function formatResults(query: string, results: SearchResult[], source: string): any {
-  if (results.length === 0) {
-    return {
-      content: [{
-        type: "text",
-        text: wrapWithInstruction(
-          `No results found for "${query}" on ${source}.`,
-          "Tell the user that no results were found and suggest alternative search terms."
-        ),
-      }],
-      structuredContent: {
-        engine: source.toLowerCase() === "brave" ? "brave" : "duckduckgo",
-        query,
-        count: 0,
-        results: [],
-      },
-    };
-  }
-
+function formatResults(query: string, results: SearchResult[]): any {
   const trimmed = results.map((r) => ({ ...r, description: truncateSnippet(r.description, LIMITS.webSnippet) }));
   const formatted = trimmed
     .map((result, index) => `${index + 1}. **${result.title}**\n   URL: ${result.url}\n   ${result.description}`)
@@ -192,12 +133,12 @@ function formatResults(query: string, results: SearchResult[], source: string): 
     content: [{
       type: "text",
       text: wrapWithInstruction(
-        `Results for: "${query}" (via ${source}, ${results.length} results)\n\n${formatted}`,
+        `Results for: "${query}" (via DuckDuckGo, ${results.length} results)\n\n${formatted}`,
         "Summarize the most relevant 2-3 results for the user. Do NOT list all results verbatim. Pick the most relevant ones and describe them briefly in your own words."
       ),
     }],
     structuredContent: {
-      engine: source.toLowerCase() === "brave" ? "brave" : "duckduckgo",
+      engine: "duckduckgo",
       query,
       count: trimmed.length,
       results: trimmed.map((r) => ({ title: r.title, url: r.url, snippet: r.description })),

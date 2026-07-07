@@ -38,3 +38,6 @@ mcp-server.log
 
 # Local scratch (mock-client baseline capture, smoke-test artifacts)
 tmp/
+
+# Documentation (working materials, not part of the public repo)
+docs/

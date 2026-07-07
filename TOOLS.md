@@ -46,10 +46,10 @@ A deny-list rejects `rm -rf /`, `format C:`, `del /f /s /q C:\`, `mkfs /dev/...`
 ## web_search
 
 ```json
-{ "query": "...", "count": 5, "engine": "duckduckgo|brave" }
+{ "query": "...", "count": 5 }
 ```
 
-Searches the web and returns a typed payload. Uses DuckDuckGo Lite (POST) by default; if `BRAVE_API_KEY` is set, falls back to Brave. Each snippet is truncated at 300 chars (`LIMITS.webSnippet`). `structuredContent` carries `{ engine, query, count, results: [{title,url,snippet}] }`.
+Searches the web via DuckDuckGo Lite (POST). Each snippet is truncated at 300 chars (`LIMITS.webSnippet`). `structuredContent` carries `{ engine: "duckduckgo", query, count, results: [{title,url,snippet}] }`.
 
 ## wiki
 

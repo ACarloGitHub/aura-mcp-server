@@ -97,5 +97,5 @@ Then restart the host application (or just close and reopen the Agent Skills pag
 - **Server does not start**: check stderr for `Aura MCP Server v3.0 started on stdio`. If you don't see that line within a few seconds of opening the host, the path or env is wrong.
 - **`Unknown tool: <name>`**: the host is calling a v2.x granular name. Hosts update automatically when they reload the descriptor list; just close and reopen the agent panel.
 - **`Sandbox: Path outside AGENT_WORKSPACE ...`**: the model tried to read or write outside the workspace. Either fix the prompt or add the path to `AURA_ALLOWED_PATHS`.
-- **DuckDuckGo CAPTCHA**: rare; wait a few minutes or set `BRAVE_API_KEY` to switch engines.
+- **DuckDuckGo CAPTCHA**: rare; wait a few minutes before retrying.
 - **RAG fails with `chromadb not found`**: install with `pip install chromadb`. Confirm the python that owns the package matches `RAG_PYTHON_PATH`.

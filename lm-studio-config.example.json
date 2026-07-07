@@ -6,8 +6,7 @@
       "args": ["/path/to/aura-mcp-server/dist/index.js"],
       "env": {
         "AGENT_WORKSPACE": "/path/to/your/workspace",
-        "ANYTHINGLLM_API_KEY": "your-anythingllm-api-key-here",
-        "BRAVE_API_KEY": "optional-brave-search-api-key"
+        "ANYTHINGLLM_API_KEY": "your-anythingllm-api-key-here"
       }
     }
   }

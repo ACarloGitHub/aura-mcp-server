@@ -70,7 +70,7 @@ src/
     ├── exec.ts             run|background + underlying impl (extended)
     ├── exec_job.ts         dispatch poll|kill|list|clean (new)
     ├── exec-safety.ts      deny-list checkCommandSafety (new)
-    ├── webSearch.ts        DuckDuckGo/Brave (existing, instruction-prefixed)
+    ├── webSearch.ts        DuckDuckGo Lite POST (existing, instruction-prefixed)
     ├── wiki.ts             search|read|write|list (existing, instruction-prefixed, structuredContent for list)
     ├── wiki_ingest.ts      ingest|query|lint|update_index|update_log
     ├── rag.ts              search|add|list|delete|collections|ingest_sessions

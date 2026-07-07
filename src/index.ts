@@ -92,20 +92,19 @@ let TOOLS: Tool[] = [
   },
   {
     name: "web_search",
-    description: "Web search via DuckDuckGo or Brave. Use for: external info.",
+    description: "Web search via DuckDuckGo. Use for: external info.",
     inputSchema: {
       type: "object",
       properties: {
         query: { type: "string", description: "Search query" },
         count: { type: "number", description: "Number of results (1-10, default 5)" },
-        engine: { type: "string", enum: ["duckduckgo", "brave"], description: "Search engine" },
       },
       required: ["query"],
     },
     outputSchema: {
       type: "object",
       properties: {
-        engine: { type: "string", enum: ["duckduckgo", "brave"] },
+        engine: { type: "string", enum: ["duckduckgo"] },
         query: { type: "string" },
         count: { type: "number" },
         results: {

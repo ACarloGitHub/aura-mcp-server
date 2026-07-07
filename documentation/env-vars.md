@@ -40,7 +40,7 @@ Otherwise the call returns `isError: true` with a `Sandbox: ...` message.
 
 | Variable | Default | Description |
 |---|---|---|
-| `BRAVE_API_KEY` | unset | Brave Search API key. If set, `web_search(engine=brave)` is honored; if not, DuckDuckGo (free) is used. |
+
 
 ## RAG (ChromaDB + Ollama)
 
@@ -61,7 +61,6 @@ Otherwise the call returns `isError: true` with a `Sandbox: ...` message.
 
 ```bash
 export AGENT_WORKSPACE=/path/to/workspace
-export BRAVE_API_KEY=your-key-here
 export ANYTHINGLLM_API_KEY=your-key-here
 ```
 
@@ -74,8 +73,7 @@ Or in the host's MCP config (`mcpServers[*].env`):
       "command": "node",
       "args": ["/path/to/aura-mcp-server/dist/index.js"],
       "env": {
-        "AGENT_WORKSPACE": "/path/to/workspace",
-        "BRAVE_API_KEY": "your-key-here"
+        "AGENT_WORKSPACE": "/path/to/workspace"
       }
     }
   }
@@ -86,7 +84,6 @@ Or in the host's MCP config (`mcpServers[*].env`):
 
 ```powershell
 $env:AGENT_WORKSPACE = "C:\path\to\workspace"
-$env:BRAVE_API_KEY = "your-key-here"
 ```
 
 Or in LM Studio's MCP config: `%USERPROFILE%\.lmstudio\mcp.json`.
