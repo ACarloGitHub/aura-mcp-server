@@ -35,3 +35,6 @@ backup/
 # Log file
 mcp-server.log
 *.log
+
+# Local scratch (mock-client baseline capture, smoke-test artifacts)
+tmp/
