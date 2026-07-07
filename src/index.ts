@@ -19,6 +19,7 @@ import { compactTool } from "./tools/compact.js";
 import { anythingllmTool } from "./tools/anythingllm.js";
 import { sendWinRTToast, notifyTool } from "./tools/notify.js";
 import { appendLogWithRotation } from "./utils/helpers.js";
+import { resolveAllowedPaths, enabledCategories } from "./utils/sandbox.js";
 
 // ============================================================
 // No aliases exposed. tools/list contains only canonical names.
@@ -27,7 +28,7 @@ import { appendLogWithRotation } from "./utils/helpers.js";
 // ============================================================
 // TOOL SCHEMAS (compact to preserve LLM context; 11 tools, v3.0)
 // ============================================================
-const TOOLS: Tool[] = [
+let TOOLS: Tool[] = [
   {
     name: "file",
     description: "Read, write, edit, or list a file in the workspace. Use for: any filesystem operation.",
@@ -300,6 +301,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   await appendLogWithRotation(logPath, logLine, maxLogMB);
 
   try {
+    const pathCheck = resolveAllowedPaths(args as any, [
+      "path",
+      "file_path",
+      "workspace",
+      "source",
+      "dir",
+      "directory",
+      "folder",
+    ]);
+    if (!pathCheck.ok) {
+      return {
+        content: [{ type: "text", text: `Sandbox: ${pathCheck.error}` }],
+        isError: true,
+      };
+    }
+
     let result: any;
     switch (name) {
       case "file":
@@ -386,9 +403,16 @@ async function main() {
   process.on("SIGTERM", () => cleanupAndExit("SIGTERM"));
   process.on("SIGINT", () => cleanupAndExit("SIGINT"));
 
+  const enabled = enabledCategories(TOOLS.map((t) => t.name));
+  if (enabled !== null) {
+    const before = TOOLS.length;
+    TOOLS = TOOLS.filter((t) => enabled.has(t.name));
+    console.error(`[MCP] AURA_ENABLED_CATEGORIES applied: ${before} -> ${TOOLS.length} tools`);
+  }
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Aura MCP Server v2.0 started on stdio");
+  console.error("Aura MCP Server v3.0 started on stdio");
 }
 
 main().catch((error) => {
