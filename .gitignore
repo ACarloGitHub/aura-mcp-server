@@ -42,10 +42,12 @@ tmp/
 # Documentation (working materials, not part of the public repo)
 docs/
 
-# Vendored runtime binaries + embeddings (re-installed by setup scripts)
-vendor/
-embeddings/
+# Logs (created at runtime by the launcher if needed)
 logs/
+
+# Note: vendor/llama.cpp/ and embeddings/ are INTENTIONALLY committed
+# so the GitHub Actions release workflow can bundle them into the OS-native
+# installer without re-downloading from third-party hosts.
 
 # Tauri build outputs
 src-tauri/target/
