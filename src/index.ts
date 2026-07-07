@@ -33,7 +33,7 @@ import { appendLogWithRotation } from "./utils/helpers.js";
 const TOOLS: Tool[] = [
   {
     name: "edit",
-    description: "Edit an existing file by replacing `search` with `replace` (first occurrence).",
+    description: "Find-and-replace edit of a file.",
     inputSchema: {
       type: "object",
       properties: {
@@ -46,7 +46,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "list_dir",
-    description: "List contents of a directory.",
+    description: "List a directory's contents.",
     inputSchema: {
       type: "object",
       properties: {
@@ -57,7 +57,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "exec",
-    description: "Run a shell command. Params: command, timeout(360s), workdir, env, background. Output max 200KB.",
+    description: "Run a shell command. Use for: any host action.",
     inputSchema: {
       type: "object",
       properties: {
@@ -72,7 +72,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "exec_poll",
-    description: "Poll output of a background exec job. Params: jobId (sessionId), tail (default 100).",
+    description: "Read output of a background job by jobId.",
     inputSchema: {
       type: "object",
       properties: {
@@ -84,7 +84,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "exec_kill",
-    description: "Kill a background exec job. Params: jobId (sessionId).",
+    description: "Kill a background job by jobId.",
     inputSchema: {
       type: "object",
       properties: {
@@ -95,7 +95,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "exec_list",
-    description: "List all background jobs (running and completed) with status and age.",
+    description: "List background jobs with status and age.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -104,7 +104,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "exec_clean",
-    description: "Clean up completed background job files. Params: maxAgeHours (default 24), all (boolean, remove all).",
+    description: "Delete completed background job files. Use for: pruning.",
     inputSchema: {
       type: "object",
       properties: {
@@ -116,7 +116,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "read",
-    description: "Read a file. Params: path, offset, limit. Images supported. Files >10MB rejected.",
+    description: "Read a file (text or image). Use for: loading context.",
     inputSchema: {
       type: "object",
       properties: {
@@ -129,7 +129,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "write",
-    description: "Write a file. Params: path, content. Creates directories automatically. Max 5MB.",
+    description: "Write a file, creating parent dirs. Use for: persisting content.",
     inputSchema: {
       type: "object",
       properties: {
@@ -141,7 +141,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "web_search",
-    description: "Web search. Params: query, count(5), engine(duckduckgo/brave). Timeout 30s.",
+    description: "Web search via DuckDuckGo or Brave. Use for: external info.",
     inputSchema: {
       type: "object",
       properties: {
@@ -152,37 +152,37 @@ const TOOLS: Tool[] = [
       required: ["query"],
     },
   },
-  { name: "wiki_search", description: "Search text across local wiki pages.", inputSchema: { type: "object", properties: { query: { type: "string", description: "Text to search for" }, maxResults: { type: "number", description: "Max results (default 10)" } }, required: ["query"] } },
-  { name: "wiki_read", description: "Read a local wiki page.", inputSchema: { type: "object", properties: { path: { type: "string", description: "Page path, e.g. 'projects/idea.md'" } }, required: ["path"] } },
-  { name: "wiki_write", description: "Create or overwrite a local wiki page.", inputSchema: { type: "object", properties: { path: { type: "string", description: "Page path" }, content: { type: "string", description: "Markdown content" } }, required: ["path", "content"] } },
-  { name: "wiki_list", description: "List all local wiki pages.", inputSchema: { type: "object", properties: { maxResults: { type: "number", description: "Max results (optional)" } }, required: [] } },
-  { name: "rag_search", description: "Semantic search inside a ChromaDB collection.", inputSchema: { type: "object", properties: { collection: { type: "string", description: "Collection name" }, query: { type: "string", description: "Semantic query" }, limit: { type: "number", description: "Max results (default 5)" }, filter: { type: "string", description: "JSON metadata filter (optional)" } }, required: ["collection", "query"] } },
+  { name: "wiki_search", description: "Full-text search across wiki pages. Use for: finding by topic.", inputSchema: { type: "object", properties: { query: { type: "string", description: "Text to search for" }, maxResults: { type: "number", description: "Max results (default 10)" } }, required: ["query"] } },
+  { name: "wiki_read", description: "Read a wiki page. Use for: loading notes or markdown.", inputSchema: { type: "object", properties: { path: { type: "string", description: "Page path, e.g. 'projects/idea.md'" } }, required: ["path"] } },
+  { name: "wiki_write", description: "Create or overwrite a wiki page. Use for: persisting notes.", inputSchema: { type: "object", properties: { path: { type: "string", description: "Page path" }, content: { type: "string", description: "Markdown content" } }, required: ["path", "content"] } },
+  { name: "wiki_list", description: "List all wiki pages. Use for: discovering knowledge.", inputSchema: { type: "object", properties: { maxResults: { type: "number", description: "Max results (optional)" } }, required: [] } },
+  { name: "rag_search", description: "Semantic search in a ChromaDB collection. Use for: context by meaning.", inputSchema: { type: "object", properties: { collection: { type: "string", description: "Collection name" }, query: { type: "string", description: "Semantic query" }, limit: { type: "number", description: "Max results (default 5)" }, filter: { type: "string", description: "JSON metadata filter (optional)" } }, required: ["collection", "query"] } },
   { name: "rag_add", description: "Add a document to a RAG collection.", inputSchema: { type: "object", properties: { collection: { type: "string", description: "Collection name" }, id: { type: "string", description: "Unique document ID" }, text: { type: "string", description: "Document text" }, metadata: { type: "string", description: "JSON metadata string (optional)" } }, required: ["collection", "id", "text"] } },
-  { name: "rag_list", description: "List documents inside a RAG collection.", inputSchema: { type: "object", properties: { collection: { type: "string", description: "Collection name" }, limit: { type: "number", description: "Max results (default 50)" } }, required: ["collection"] } },
+  { name: "rag_list", description: "List documents in a RAG collection.", inputSchema: { type: "object", properties: { collection: { type: "string", description: "Collection name" }, limit: { type: "number", description: "Max results (default 50)" } }, required: ["collection"] } },
   { name: "rag_delete", description: "Delete a document from a RAG collection.", inputSchema: { type: "object", properties: { collection: { type: "string", description: "Collection name" }, id: { type: "string", description: "Document ID to delete" } }, required: ["collection", "id"] } },
   { name: "rag_collections", description: "List all available ChromaDB collections.", inputSchema: { type: "object", properties: {}, required: [] } },
-  { name: "rag_ingest_sessions", description: "Index AnythingLLM session exports into a RAG collection.", inputSchema: { type: "object", properties: { folder: { type: "string", description: "Specific session folder (optional)" }, reindex: { type: "boolean", description: "Re-index from scratch" } }, required: [] } },
+  { name: "rag_ingest_sessions", description: "Index AnythingLLM sessions into RAG. Use for: feeding past chats.", inputSchema: { type: "object", properties: { folder: { type: "string", description: "Specific session folder (optional)" }, reindex: { type: "boolean", description: "Re-index from scratch" } }, required: [] } },
   { name: "wiki_ingest_raw", description: "Ingest a raw file into the advanced wiki.", inputSchema: { type: "object", properties: { source: { type: "string", description: "Path of the raw file" } }, required: ["source"] } },
   { name: "wiki_ingest_query", description: "Semantic query against the advanced wiki.", inputSchema: { type: "object", properties: { query_text: { type: "string", description: "Query text" } }, required: ["query_text"] } },
-  { name: "wiki_ingest_lint", description: "Lint pass over the advanced wiki (integrity check).", inputSchema: { type: "object", properties: {}, required: [] } },
-  { name: "wiki_ingest_update_index", description: "Rebuild the index of the advanced wiki.", inputSchema: { type: "object", properties: {}, required: [] } },
-  { name: "wiki_ingest_update_log", description: "Append an entry to the advanced wiki operation log.", inputSchema: { type: "object", properties: { source: { type: "string", description: "Operation description" } }, required: ["source"] } },
-  { name: "planner_create", description: "Create a new plan stored in plans/.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" }, content: { type: "string", description: "Plan markdown content" } }, required: ["name", "content"] } },
+  { name: "wiki_ingest_lint", description: "Integrity check on the advanced wiki.", inputSchema: { type: "object", properties: {}, required: [] } },
+  { name: "wiki_ingest_update_index", description: "Rebuild the advanced wiki index.", inputSchema: { type: "object", properties: {}, required: [] } },
+  { name: "wiki_ingest_update_log", description: "Append to the advanced wiki operation log.", inputSchema: { type: "object", properties: { source: { type: "string", description: "Operation description" } }, required: ["source"] } },
+  { name: "planner_create", description: "Create a new plan in plans/.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" }, content: { type: "string", description: "Plan markdown content" } }, required: ["name", "content"] } },
   { name: "planner_read", description: "Read an existing plan.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" } }, required: ["name"] } },
-  { name: "planner_list", description: "List all plans.", inputSchema: { type: "object", properties: {}, required: [] } },
-  { name: "planner_update", description: "Update the content of an existing plan.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" }, content: { type: "string", description: "New markdown content" } }, required: ["name", "content"] } },
-  { name: "planner_delete", description: "Delete a plan.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" } }, required: ["name"] } },
-  { name: "planner_next", description: "Get next blocking step of a plan. Optionally answers an open question.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" }, answer: { type: "string", description: "Answer to a blocking question (optional)" } }, required: ["name"] } },
-  { name: "planner_status", description: "Concise progress status of a plan.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" } }, required: ["name"] } },
-  { name: "compact_memory", description: "Auto-compact memory beyond the line threshold.", inputSchema: { type: "object", properties: { threshold: { type: "number", description: "Line threshold (default 300)" } }, required: [] } },
+  { name: "planner_list", description: "List all stored plans.", inputSchema: { type: "object", properties: {}, required: [] } },
+  { name: "planner_update", description: "Update an existing plan's content.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" }, content: { type: "string", description: "New markdown content" } }, required: ["name", "content"] } },
+  { name: "planner_delete", description: "Delete a stored plan.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" } }, required: ["name"] } },
+  { name: "planner_next", description: "Advance a plan by one step. Use for: driving it forward.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" }, answer: { type: "string", description: "Answer to a blocking question (optional)" } }, required: ["name"] } },
+  { name: "planner_status", description: "Show concise progress of a plan. Use for: percent and blockers.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" } }, required: ["name"] } },
+  { name: "compact_memory", description: "Compact MEMORY.md beyond a line threshold.", inputSchema: { type: "object", properties: { threshold: { type: "number", description: "Line threshold (default 300)" } }, required: [] } },
   { name: "compact_status", description: "Status of memory files (sizes, last compaction).", inputSchema: { type: "object", properties: {}, required: [] } },
   { name: "compact_list", description: "List already compacted sessions.", inputSchema: { type: "object", properties: {}, required: [] } },
-  { name: "anythingllm_list", description: "List AnythingLLM workspaces (requires API at localhost:3001).", inputSchema: { type: "object", properties: { apiKey: { type: "string", description: "API key (optional, uses ANYTHINGLLM_API_KEY env var)" } }, required: [] } },
+  { name: "anythingllm_list", description: "List AnythingLLM workspaces.", inputSchema: { type: "object", properties: { apiKey: { type: "string", description: "API key (optional, uses ANYTHINGLLM_API_KEY env var)" } }, required: [] } },
   { name: "anythingllm_export", description: "Export threads of an AnythingLLM workspace.", inputSchema: { type: "object", properties: { workspace: { type: "string", description: "Workspace slug" }, thread: { type: "string", description: "Thread slug (optional)" }, apiKey: { type: "string", description: "API key (optional)" } }, required: ["workspace"] } },
   { name: "anythingllm_export_all", description: "Export all AnythingLLM workspaces.", inputSchema: { type: "object", properties: { apiKey: { type: "string", description: "API key (optional)" } }, required: [] } },
   {
     name: "notify",
-    description: "Desktop notification + beep. Params: message, title, sound(boolean, default true).",
+    description: "Desktop notification with optional beep.",
     inputSchema: {
       type: "object",
       properties: {
