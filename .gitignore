@@ -44,10 +44,14 @@ docs/
 
 # Logs (created at runtime by the launcher if needed)
 logs/
+embeddings/
 
-# Note: vendor/llama.cpp/ and embeddings/ are INTENTIONALLY committed
-# so the GitHub Actions release workflow can bundle them into the OS-native
-# installer without re-downloading from third-party hosts.
+# Note: vendor/llama.cpp/ is INTENTIONALLY committed so the GitHub Actions
+# release workflow can bundle it into the OS-native installer without
+# re-downloading from third-party hosts. embeddings/nomic-embed-text-v2-moe.Q8_0.gguf
+# lives in the assets of the `runtime-resources-v1` release and is downloaded
+# by the workflow from there (the file is ~488 MB and exceeds GitHub's 100 MB
+# per-file push limit without LFS).
 
 # Tauri build outputs
 src-tauri/target/
