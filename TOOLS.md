@@ -84,7 +84,7 @@ Curate the structured knowledge graph (Karpathy-style).
 { "action": "search|add|list|delete|collections|ingest_sessions", "collection": "...", "query": "...", "id": "...", "text": "...", "metadata": "...", "limit": 5, "filter": "..." }
 ```
 
-Semantic search via ChromaDB with Ollama embeddings.
+Semantic search via ChromaDB over documents, with embeddings computed by a local `llama.cpp` server running `nomic-embed-text-v1.5`. See `scripts/install_embeddings.*` for setup.
 
 - `search`: returns chunks ordered by distance. Snippet per chunk capped at 500 chars (`LIMITS.ragChunk`). `structuredContent` carries `{ collection, query, count, results: [{text,distance,metadata}] }`.
 - `add`/`delete`: idempotent on document ID.

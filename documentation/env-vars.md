@@ -42,14 +42,16 @@ Otherwise the call returns `isError: true` with a `Sandbox: ...` message.
 |---|---|---|
 
 
-## RAG (ChromaDB + Ollama)
+## RAG (ChromaDB + llama.cpp embeddings)
+
+The embedding server is the CPU-only `llama.cpp` build started by `scripts/start_embeddings.sh` (POSIX) or `scripts\start_embeddings.bat` (Windows). Run `scripts/install_embeddings.*` once to download llama.cpp and the `nomic-embed-text-v1.5.Q4_K_M` GGUF into `vendor/llama.cpp/` and `embeddings/`.
 
 | Variable | Default | Description |
 |---|---|---|
-| `RAG_PYTHON_PATH` | auto-detected | Python executable with `chromadb` installed. Auto-detection looks for `.venv/Scripts/python.exe` (Win) or `.venv/bin/python3` (POSIX) before searching `PATH`. |
-| `CHROMA_DATA_DIR` | `{server_dir}/rag/chroma_data` | Persisted ChromaDB store. |
-| `OLLAMA_EMBED_URL` | `http://localhost:11434/api/embeddings` | Ollama embeddings endpoint. |
-| `OLLAMA_EMBED_MODEL` | `nomic-embed-text` | Ollama model used to produce embeddings. |
+| `RAG_PYTHON_PATH` | auto-detected | Python executable with chromadb installed. |
+| `CHROMA_DATA_DIR` | `{server_dir}/rag/chroma_data` | ChromaDB persistence directory. |
+| `EMBED_URL` | `http://127.0.0.1:8081` | Endpoint of the local llama.cpp embedding server. |
+| `EMBED_MODEL` | `nomic-embed-text-v1.5` | Identifier sent in the embedding request body. |
 
 ## LM Studio
 

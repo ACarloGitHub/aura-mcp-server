@@ -7,7 +7,7 @@ This document covers installing Aura MCP Server v3.0 and wiring it into either A
 - Node.js 18+
 - AnythingLLM Desktop 1.8+ **or** LM Studio 0.3.17+
 - A workspace directory (any empty folder; the agent will populate it on first boot)
-- Optional: Python 3 + `chromadb` and Ollama with `nomic-embed-text` (only for the `rag` tool)
+- Optional: Python 3 + `chromadb` (for RAG). The embedder is the local `llama.cpp` server with a `nomic-embed-text-v1.5` GGUF downloaded by `scripts/install_embeddings.*` (only for the `rag` tool).
 
 ## Clone and Build
 

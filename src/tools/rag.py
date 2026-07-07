@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """
-RAG Engine — Python backend for ChromaDB + embeddings via Ollama (nomic-embed-text).
-No dependency on llama-cpp-python. Uses the local Ollama API for embeddings.
-Called by the MCP server TypeScript tools.
+RAG Engine — Python backend for ChromaDB + embeddings via llama.cpp
+running locally with nomic-embed-text-v1.5. No CUDA dependency; the
+embedding server is the CPU-only build of llama-server launched by
+scripts/start_embeddings.sh / .bat.
+
+The llama.cpp embedding server exposes an Ollama-compatible /embedding
+endpoint, so the wire format here matches what we used to send to Ollama.
 
 Usage:
     python3 rag.py add --collection sessions --id "session-123" --text "content..." --metadata '{"source":"lm-studio","date":"2026-04-24"}'
@@ -27,27 +31,36 @@ from chromadb.config import Settings
 # ─── Config ──────────────────────────────────────────────────────────────────
 _script_dir = Path(__file__).resolve().parent       # aura-mcp-server/src/tools/
 _server_dir = _script_dir.parent.parent               # aura-mcp-server/
-_project_root = _server_dir.parent                    # parent workspace dir
 
 BASE_DIR = _server_dir
 CHROMA_DIR = str(BASE_DIR / "rag" / "chroma_data")
 COLLECTION_NAME = "agent_wiki"
-OLLAMA_EMBED_URL = os.environ.get("OLLAMA_EMBED_URL", "http://localhost:11434/api/embeddings")
-OLLAMA_MODEL = os.environ.get("OLLAMA_EMBED_MODEL", "nomic-embed-text")
+
+# llama.cpp embedding server (Ollama-compatible API).
+EMBED_BASE_URL = os.environ.get("EMBED_URL", "http://127.0.0.1:8081")
+EMBED_MODEL = os.environ.get("EMBED_MODEL", "nomic-embed-text-v1.5")
 
 
-def get_embeddings(texts):
-    """Generate embeddings using the local Ollama API."""
+def _embed_url() -> str:
+    base = EMBED_BASE_URL.rstrip("/")
+    # llama-server with --embedding speaks Ollama's /api/embeddings.
+    return f"{base}/api/embeddings"
+
+
+def get_embeddings(texts, is_query: bool = False):
+    """Generate embeddings via the local llama.cpp embedding server."""
     results = []
+    url = _embed_url()
     for text in texts:
         if not text or not text.strip():
             text = "(empty)"
+        prefix = "search_query: " if is_query else "search_document: "
         payload = json.dumps({
-            "model": OLLAMA_MODEL,
-            "prompt": f"search_document: {text[:2000]}"
+            "model": EMBED_MODEL,
+            "prompt": f"{prefix}{text[:2000]}"
         }).encode("utf-8")
         req = urllib.request.Request(
-            OLLAMA_EMBED_URL,
+            url,
             data=payload,
             headers={"Content-Type": "application/json"}
         )
@@ -56,9 +69,12 @@ def get_embeddings(texts):
                 data = json.loads(resp.read().decode("utf-8"))
             results.append(data["embedding"])
         except urllib.error.URLError as e:
-            raise RuntimeError(f"Ollama connection error ({OLLAMA_EMBED_URL}): {e}")
+            raise RuntimeError(
+                f"Embedding server unreachable at {url}. "
+                f"Is scripts/start_embeddings.sh running? Reason: {e}"
+            )
         except KeyError:
-            raise RuntimeError(f"Ollama response missing 'embedding' field: {data}")
+            raise RuntimeError(f"Embedding response missing 'embedding' field: {data}")
     return results
 
 
@@ -81,7 +97,7 @@ KNOWN_ENTITIES = {
     ],
     "projects": [
         # Tech tools always useful to recognize
-        "AnythingLLM", "LM Studio", "ChromaDB", "Ollama",
+        "AnythingLLM", "LM Studio", "ChromaDB", "llama.cpp",
         "RAG", "MCP", "nomic-embed-text",
         # Add your own projects, e.g.: "MyProject", "WorkApp"
     ],
@@ -222,8 +238,7 @@ def cmd_search(args):
         name=args.collection,
         metadata={"hnsw:space": "cosine"}
     )
-    query_text = f"search_query: {args.query}"
-    query_embedding = get_embeddings([query_text])[0]
+    query_embedding = get_embeddings([args.query], is_query=True)[0]  
     where_filter = None
     if args.filter:
         try:
@@ -293,7 +308,7 @@ def cmd_collections(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="RAG Engine - ChromaDB + Ollama embeddings")
+    parser = argparse.ArgumentParser(description="RAG Engine - ChromaDB + llama.cpp embeddings")
     subparsers = parser.add_subparsers(dest="command", help="Command")
     add_parser = subparsers.add_parser("add", help="Add a document")
     add_parser.add_argument("--collection", required=True, help="Collection name")
