@@ -2,3 +2,4 @@ target/
 WixTools/
 **/*.rs.bk
 Cargo.lock
+gen/schemas/

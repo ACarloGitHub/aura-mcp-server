@@ -16,12 +16,10 @@
         "title": "AuraMCP",
         "width": 1,
         "height": 1,
-        "minimized": true,
         "visible": false,
         "decorations": false,
         "center": false,
         "resizable": false,
-        "alwaysOnTop": false,
         "skipTaskbar": true
       }
     ],
@@ -40,8 +38,9 @@
     "longDescription": "AuraMCP launches the Node.js based Model Context Protocol server for AnythingLLM and LM Studio. Bundles llama.cpp and nomic-embed-text-v2-moe GGUF for local RAG.",
     "publisher": "ACarloGitHub",
     "resources": [
-      "../vendor/**",
-      "../embeddings/**"
+      "../vendor/llama.cpp/windows/*",
+      "../vendor/llama.cpp/macos/*",
+      "../vendor/llama.cpp/linux/*"
     ],
     "externalBin": [],
     "copyright": "Copyright (c) 2026 ACarloGitHub",

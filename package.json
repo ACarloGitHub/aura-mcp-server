@@ -44,6 +44,7 @@
     "node-notifier": "^10.0.1"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4",
     "@types/node": "^20.0.0",
     "@types/node-notifier": "^8.0.5",
     "cross-env": "^7.0.3",
