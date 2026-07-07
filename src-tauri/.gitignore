@@ -1,0 +1,4 @@
+target/
+WixTools/
+**/*.rs.bk
+Cargo.lock

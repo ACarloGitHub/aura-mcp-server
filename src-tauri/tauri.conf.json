@@ -1,0 +1,54 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "AuraMCP",
+  "version": "3.0.1",
+  "identifier": "com.auramcp.server",
+  "build": {
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "",
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "AuraMCP",
+        "width": 1,
+        "height": 1,
+        "minimized": true,
+        "visible": false,
+        "decorations": false,
+        "center": false,
+        "resizable": false,
+        "alwaysOnTop": false,
+        "skipTaskbar": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/icon.png"
+    ],
+    "category": "DeveloperTool",
+    "shortDescription": "AuraMCP Model Context Protocol server launcher.",
+    "longDescription": "AuraMCP launches the Node.js based Model Context Protocol server for AnythingLLM and LM Studio. Bundles llama.cpp and nomic-embed-text-v2-moe GGUF for local RAG.",
+    "publisher": "ACarloGitHub",
+    "resources": [
+      "../vendor/**",
+      "../embeddings/**"
+    ],
+    "externalBin": [],
+    "copyright": "Copyright (c) 2026 ACarloGitHub",
+    "homepage": "https://github.com/ACarloGitHub/aura-mcp-server",
+    "shortDescription": "AuraMCP Server launcher",
+    "longDescription": "AuraMCP launches the Node.js based Model Context Protocol server for AnythingLLM and LM Studio. Bundles llama.cpp and nomic-embed-text-v2-moe GGUF for local RAG.",
+    "category": "DeveloperTool",
+    "createUpdaterArtifacts": false
+  }
+}
