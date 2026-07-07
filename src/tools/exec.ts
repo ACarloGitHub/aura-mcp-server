@@ -10,9 +10,10 @@ interface ExecArgs {
   timeout?: number;
   background?: boolean;
   env?: Record<string, string>;
+  action?: "run" | "background";
 }
 
-const MAX_OUTPUT_CHARS = 200_000;
+const MAX_OUTPUT_CHARS = LIMITS.execOutput;
 const DEFAULT_TIMEOUT = 360;
 const MAX_TIMEOUT = 7200;
 
@@ -22,7 +23,8 @@ function getBgDir(): string {
 }
 
 export async function execTool(args: ExecArgs): Promise<any> {
-  const { command, workdir, timeout = DEFAULT_TIMEOUT, background = false, env } = args;
+  const { command, workdir, timeout = DEFAULT_TIMEOUT, background: bgFlag, env, action } = args;
+  const background = bgFlag === true || action === "background";
   const clampedTimeout = Math.min(Math.max(timeout, 1), MAX_TIMEOUT);
 
   const options: SpawnOptions = {

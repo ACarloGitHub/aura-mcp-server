@@ -7,11 +7,9 @@ import {
   ListToolsRequestSchema,
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
-import { execTool, execPollTool, execKillTool, execListTool, execCleanTool } from "./tools/exec.js";
-import { readTool } from "./tools/read.js";
-import { writeTool } from "./tools/write.js";
-import { editTool } from "./tools/edit.js";
-import { listDirTool } from "./tools/list_dir.js";
+import { execTool } from "./tools/exec.js";
+import { fileTool } from "./tools/file.js";
+import { execJobTool } from "./tools/exec_job.js";
 import { webSearchTool } from "./tools/webSearch.js";
 import { wikiTool } from "./tools/wiki.js";
 import { ragTool } from "./tools/rag.js";
@@ -19,8 +17,7 @@ import { wikiIngestTool } from "./tools/wiki_ingest.js";
 import { plannerTool } from "./tools/planner.js";
 import { compactTool } from "./tools/compact.js";
 import { anythingllmTool } from "./tools/anythingllm.js";
-import { sendWinRTToast } from "./tools/notify.js";
-import { notifyTool } from "./tools/notify.js";
+import { sendWinRTToast, notifyTool } from "./tools/notify.js";
 import { appendLogWithRotation } from "./utils/helpers.js";
 
 // ============================================================
@@ -28,115 +25,54 @@ import { appendLogWithRotation } from "./utils/helpers.js";
 // ============================================================
 
 // ============================================================
-// TOOL SCHEMAS (compact to preserve LLM context)
+// TOOL SCHEMAS (compact to preserve LLM context; 11 tools, v3.0)
 // ============================================================
 const TOOLS: Tool[] = [
   {
-    name: "edit",
-    description: "Find-and-replace edit of a file.",
+    name: "file",
+    description: "Read, write, edit, or list a file in the workspace. Use for: any filesystem operation.",
     inputSchema: {
       type: "object",
       properties: {
-        path: { type: "string", description: "File path" },
-        search: { type: "string", description: "Exact text to find" },
-        replace: { type: "string", description: "Replacement text" },
+        action: { type: "string", enum: ["read", "write", "edit", "list"], description: "Which file action to perform" },
+        path: { type: "string", description: "File or directory path (required for read/write/edit, optional for list)" },
+        content: { type: "string", description: "File content (action=write)" },
+        search: { type: "string", description: "Exact text to find (action=edit)" },
+        replace: { type: "string", description: "Replacement text (action=edit)" },
+        offset: { type: "number", description: "Start line for text reads (action=read, 1-based, optional)" },
+        limit: { type: "number", description: "Maximum number of lines for text reads (action=read, optional)" },
       },
-      required: ["path", "search", "replace"],
-    },
-  },
-  {
-    name: "list_dir",
-    description: "List a directory's contents.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        path: { type: "string", description: "Directory path" },
-      },
-      required: ["path"],
+      required: ["action"],
     },
   },
   {
     name: "exec",
-    description: "Run a shell command. Use for: any host action.",
+    description: "Run a shell command. Use for: any host action the agent needs.",
     inputSchema: {
       type: "object",
       properties: {
+        action: { type: "string", enum: ["run", "background"], description: "run waits for completion; background returns a sessionId" },
         command: { type: "string", description: "Command to run" },
         workdir: { type: "string", description: "Working directory (optional)" },
         timeout: { type: "number", description: "Timeout in seconds (default 360, max 7200)" },
-        background: { type: "boolean", description: "Run in background (optional). Returns sessionId immediately." },
         env: { type: "object", description: "Additional environment variables (optional)" },
       },
-      required: ["command"],
+      required: ["action", "command"],
     },
   },
   {
-    name: "exec_poll",
-    description: "Read output of a background job by jobId.",
+    name: "exec_job",
+    description: "Manage a background exec job. Use for: polling, killing, listing, cleaning jobs.",
     inputSchema: {
       type: "object",
       properties: {
-        jobId: { type: "string", description: "The sessionId returned by exec with background:true" },
-        tail: { type: "number", description: "Last N lines to return (default 100)" },
+        action: { type: "string", enum: ["poll", "kill", "list", "clean"], description: "Job management action" },
+        jobId: { type: "string", description: "sessionId of the job (required for poll and kill)" },
+        tail: { type: "number", description: "Last N lines to return (action=poll, default 100)" },
+        maxAgeHours: { type: "number", description: "Delete completed jobs older than N hours (action=clean, default 24)" },
+        all: { type: "boolean", description: "Delete all completed jobs regardless of age (action=clean)" },
       },
-      required: ["jobId"],
-    },
-  },
-  {
-    name: "exec_kill",
-    description: "Kill a background job by jobId.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        jobId: { type: "string", description: "The sessionId of the job to terminate" },
-      },
-      required: ["jobId"],
-    },
-  },
-  {
-    name: "exec_list",
-    description: "List background jobs with status and age.",
-    inputSchema: {
-      type: "object",
-      properties: {},
-      required: [],
-    },
-  },
-  {
-    name: "exec_clean",
-    description: "Delete completed background job files. Use for: pruning.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        maxAgeHours: { type: "number", description: "Delete completed jobs older than N hours (default 24)" },
-        all: { type: "boolean", description: "If true, delete all completed jobs regardless of age" },
-      },
-      required: [],
-    },
-  },
-  {
-    name: "read",
-    description: "Read a file (text or image). Use for: loading context.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        path: { type: "string", description: "Path of the file to read" },
-        offset: { type: "number", description: "Start line for text files (1-based, optional)" },
-        limit: { type: "number", description: "Maximum number of lines for text files (optional)" },
-      },
-      required: ["path"],
-    },
-  },
-  {
-    name: "write",
-    description: "Write a file, creating parent dirs. Use for: persisting content.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        path: { type: "string", description: "Path of the file to write" },
-        content: { type: "string", description: "Content to write" },
-      },
-      required: ["path", "content"],
+      required: ["action"],
     },
   },
   {
@@ -152,37 +88,97 @@ const TOOLS: Tool[] = [
       required: ["query"],
     },
   },
-  { name: "wiki_search", description: "Full-text search across wiki pages. Use for: finding by topic.", inputSchema: { type: "object", properties: { query: { type: "string", description: "Text to search for" }, maxResults: { type: "number", description: "Max results (default 10)" } }, required: ["query"] } },
-  { name: "wiki_read", description: "Read a wiki page. Use for: loading notes or markdown.", inputSchema: { type: "object", properties: { path: { type: "string", description: "Page path, e.g. 'projects/idea.md'" } }, required: ["path"] } },
-  { name: "wiki_write", description: "Create or overwrite a wiki page. Use for: persisting notes.", inputSchema: { type: "object", properties: { path: { type: "string", description: "Page path" }, content: { type: "string", description: "Markdown content" } }, required: ["path", "content"] } },
-  { name: "wiki_list", description: "List all wiki pages. Use for: discovering knowledge.", inputSchema: { type: "object", properties: { maxResults: { type: "number", description: "Max results (optional)" } }, required: [] } },
-  { name: "rag_search", description: "Semantic search in a ChromaDB collection. Use for: context by meaning.", inputSchema: { type: "object", properties: { collection: { type: "string", description: "Collection name" }, query: { type: "string", description: "Semantic query" }, limit: { type: "number", description: "Max results (default 5)" }, filter: { type: "string", description: "JSON metadata filter (optional)" } }, required: ["collection", "query"] } },
-  { name: "rag_add", description: "Add a document to a RAG collection.", inputSchema: { type: "object", properties: { collection: { type: "string", description: "Collection name" }, id: { type: "string", description: "Unique document ID" }, text: { type: "string", description: "Document text" }, metadata: { type: "string", description: "JSON metadata string (optional)" } }, required: ["collection", "id", "text"] } },
-  { name: "rag_list", description: "List documents in a RAG collection.", inputSchema: { type: "object", properties: { collection: { type: "string", description: "Collection name" }, limit: { type: "number", description: "Max results (default 50)" } }, required: ["collection"] } },
-  { name: "rag_delete", description: "Delete a document from a RAG collection.", inputSchema: { type: "object", properties: { collection: { type: "string", description: "Collection name" }, id: { type: "string", description: "Document ID to delete" } }, required: ["collection", "id"] } },
-  { name: "rag_collections", description: "List all available ChromaDB collections.", inputSchema: { type: "object", properties: {}, required: [] } },
-  { name: "rag_ingest_sessions", description: "Index AnythingLLM sessions into RAG. Use for: feeding past chats.", inputSchema: { type: "object", properties: { folder: { type: "string", description: "Specific session folder (optional)" }, reindex: { type: "boolean", description: "Re-index from scratch" } }, required: [] } },
-  { name: "wiki_ingest_raw", description: "Ingest a raw file into the advanced wiki.", inputSchema: { type: "object", properties: { source: { type: "string", description: "Path of the raw file" } }, required: ["source"] } },
-  { name: "wiki_ingest_query", description: "Semantic query against the advanced wiki.", inputSchema: { type: "object", properties: { query_text: { type: "string", description: "Query text" } }, required: ["query_text"] } },
-  { name: "wiki_ingest_lint", description: "Integrity check on the advanced wiki.", inputSchema: { type: "object", properties: {}, required: [] } },
-  { name: "wiki_ingest_update_index", description: "Rebuild the advanced wiki index.", inputSchema: { type: "object", properties: {}, required: [] } },
-  { name: "wiki_ingest_update_log", description: "Append to the advanced wiki operation log.", inputSchema: { type: "object", properties: { source: { type: "string", description: "Operation description" } }, required: ["source"] } },
-  { name: "planner_create", description: "Create a new plan in plans/.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" }, content: { type: "string", description: "Plan markdown content" } }, required: ["name", "content"] } },
-  { name: "planner_read", description: "Read an existing plan.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" } }, required: ["name"] } },
-  { name: "planner_list", description: "List all stored plans.", inputSchema: { type: "object", properties: {}, required: [] } },
-  { name: "planner_update", description: "Update an existing plan's content.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" }, content: { type: "string", description: "New markdown content" } }, required: ["name", "content"] } },
-  { name: "planner_delete", description: "Delete a stored plan.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" } }, required: ["name"] } },
-  { name: "planner_next", description: "Advance a plan by one step. Use for: driving it forward.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" }, answer: { type: "string", description: "Answer to a blocking question (optional)" } }, required: ["name"] } },
-  { name: "planner_status", description: "Show concise progress of a plan. Use for: percent and blockers.", inputSchema: { type: "object", properties: { name: { type: "string", description: "Plan name" } }, required: ["name"] } },
-  { name: "compact_memory", description: "Compact MEMORY.md beyond a line threshold.", inputSchema: { type: "object", properties: { threshold: { type: "number", description: "Line threshold (default 300)" } }, required: [] } },
-  { name: "compact_status", description: "Status of memory files (sizes, last compaction).", inputSchema: { type: "object", properties: {}, required: [] } },
-  { name: "compact_list", description: "List already compacted sessions.", inputSchema: { type: "object", properties: {}, required: [] } },
-  { name: "anythingllm_list", description: "List AnythingLLM workspaces.", inputSchema: { type: "object", properties: { apiKey: { type: "string", description: "API key (optional, uses ANYTHINGLLM_API_KEY env var)" } }, required: [] } },
-  { name: "anythingllm_export", description: "Export threads of an AnythingLLM workspace.", inputSchema: { type: "object", properties: { workspace: { type: "string", description: "Workspace slug" }, thread: { type: "string", description: "Thread slug (optional)" }, apiKey: { type: "string", description: "API key (optional)" } }, required: ["workspace"] } },
-  { name: "anythingllm_export_all", description: "Export all AnythingLLM workspaces.", inputSchema: { type: "object", properties: { apiKey: { type: "string", description: "API key (optional)" } }, required: [] } },
+  {
+    name: "wiki",
+    description: "Manage the local wiki. Use for: notes and knowledge pages.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["search", "read", "write", "list"], description: "Which wiki action to perform" },
+        query: { type: "string", description: "Text to search for (action=search)" },
+        path: { type: "string", description: "Page path (action=read/write, e.g. 'projects/idea.md')" },
+        content: { type: "string", description: "Markdown content (action=write)" },
+        maxResults: { type: "number", description: "Max results (action=search/list, default 10)" },
+      },
+      required: ["action"],
+    },
+  },
+  {
+    name: "wiki_ingest",
+    description: "Advanced wiki ingest, query, lint, and index updates. Use for: knowledge-graph curation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["ingest", "query", "lint", "update_index", "update_log"], description: "Which ingest action to perform" },
+        source: { type: "string", description: "Path of the raw file (action=ingest) or operation description (action=update_log)" },
+        query_text: { type: "string", description: "Query text (action=query)" },
+      },
+      required: ["action"],
+    },
+  },
+  {
+    name: "rag",
+    description: "Semantic search and document management over ChromaDB collections. Use for: context by meaning.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["search", "add", "list", "delete", "collections", "ingest_sessions"], description: "Which RAG action to perform" },
+        collection: { type: "string", description: "Collection name (search/add/list/delete)" },
+        query: { type: "string", description: "Semantic query (action=search)" },
+        id: { type: "string", description: "Document ID (action=add/delete)" },
+        text: { type: "string", description: "Document text (action=add)" },
+        metadata: { type: "string", description: "JSON metadata string (action=add, optional)" },
+        limit: { type: "number", description: "Max results (action=search default 5, list default 50)" },
+        filter: { type: "string", description: "JSON metadata filter (action=search, optional)" },
+        folder: { type: "string", description: "Specific session folder (action=ingest_sessions, optional)" },
+        reindex: { type: "boolean", description: "Re-index from scratch (action=ingest_sessions)" },
+      },
+      required: ["action"],
+    },
+  },
+  {
+    name: "planner",
+    description: "Create, read, update, delete, advance or query phased plans. Use for: structured multi-step work.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["create", "read", "list", "update", "delete", "next", "status"], description: "Which planner action to perform" },
+        name: { type: "string", description: "Plan name (create/read/update/delete/next/status)" },
+        content: { type: "string", description: "Plan markdown content (create/update)" },
+        answer: { type: "string", description: "Answer to a blocking question (action=next, optional)" },
+      },
+      required: ["action"],
+    },
+  },
+  {
+    name: "compact",
+    description: "Compact or inspect MEMORY.md and compacted sessions. Use for: bounding long-term notes.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["memory", "status", "list"], description: "Which compact action to perform" },
+        threshold: { type: "number", description: "Line threshold (action=memory, default 300)" },
+      },
+      required: ["action"],
+    },
+  },
+  {
+    name: "anythingllm",
+    description: "List or export AnythingLLM workspaces. Use for: capturing chat history.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["list", "export", "export-all"], description: "Which anythingllm action to perform" },
+        workspace: { type: "string", description: "Workspace slug (action=export)" },
+        thread: { type: "string", description: "Thread slug (action=export, optional)" },
+        apiKey: { type: "string", description: "API key (optional, uses ANYTHINGLLM_API_KEY env var)" },
+      },
+      required: ["action"],
+    },
+  },
   {
     name: "notify",
-    description: "Desktop notification with optional beep.",
+    description: "Desktop notification with optional beep. Use for: alerting the user.",
     inputSchema: {
       type: "object",
       properties: {
@@ -306,64 +302,36 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     let result: any;
     switch (name) {
+      case "file":
+        result = await fileTool(args as any);
+        break;
       case "exec":
         result = await execTool(args as any);
         break;
-      case "exec_poll":
-        result = await execPollTool(args as any);
-        break;
-      case "exec_kill":
-        result = await execKillTool(args as any);
-        break;
-      case "exec_list":
-        result = await execListTool();
-        break;
-      case "exec_clean":
-        result = await execCleanTool(args as any);
-        break;
-      case "read":
-        result = await readTool(args as any);
-        break;
-      case "write":
-        result = await writeTool(args as any);
-        break;
-      case "edit":
-        result = await editTool(args as any);
-        break;
-      case "list_dir":
-        result = await listDirTool(args as any);
+      case "exec_job":
+        result = await execJobTool(args as any);
         break;
       case "web_search":
         result = await webSearchTool(args as any);
         break;
-      case "wiki_search": result = await wikiTool({ ...(args as any), action: "search" } as any); break;
-      case "wiki_read": result = await wikiTool({ ...(args as any), action: "read" } as any); break;
-      case "wiki_write": result = await wikiTool({ ...(args as any), action: "write" } as any); break;
-      case "wiki_list": result = await wikiTool({ ...(args as any), action: "list" } as any); break;
-      case "rag_search": result = await ragTool({ ...(args as any), action: "search" } as any); break;
-      case "rag_add": result = await ragTool({ ...(args as any), action: "add" } as any); break;
-      case "rag_list": result = await ragTool({ ...(args as any), action: "list" } as any); break;
-      case "rag_delete": result = await ragTool({ ...(args as any), action: "delete" } as any); break;
-      case "rag_collections": result = await ragTool({ ...(args as any), action: "collections" } as any); break;
-      case "rag_ingest_sessions": result = await ragTool({ ...(args as any), action: "ingest_sessions" } as any); break;
-      case "wiki_ingest_raw": result = await wikiIngestTool({ ...(args as any), action: "ingest" } as any); break;
-      case "wiki_ingest_query": result = await wikiIngestTool({ ...(args as any), action: "query" } as any); break;
-      case "wiki_ingest_lint": result = await wikiIngestTool({ ...(args as any), action: "lint" } as any); break;
-      case "wiki_ingest_update_index": result = await wikiIngestTool({ ...(args as any), action: "update_index" } as any); break;
-      case "wiki_ingest_update_log": result = await wikiIngestTool({ ...(args as any), action: "update_log" } as any); break;
-      case "compact_memory": result = await compactTool({ ...(args as any), action: "memory" } as any); break;
-      case "compact_status": result = await compactTool({ ...(args as any), action: "status" } as any); break;
-      case "compact_list": result = await compactTool({ ...(args as any), action: "list" } as any); break;
-      case "planner_create": result = await plannerTool({ ...(args as any), action: "create" } as any); break;
-      case "planner_read": result = await plannerTool({ ...(args as any), action: "read" } as any); break;
-      case "planner_list": result = await plannerTool({ ...(args as any), action: "list" } as any); break;
-      case "planner_update": result = await plannerTool({ ...(args as any), action: "update" } as any); break;
-      case "planner_delete": result = await plannerTool({ ...(args as any), action: "delete" } as any); break;
-      case "planner_next": result = await plannerTool({ ...(args as any), action: "next" } as any); break;
-      case "planner_status": result = await plannerTool({ ...(args as any), action: "status" } as any); break;
-      case "anythingllm_list": result = await anythingllmTool({ ...(args as any), action: "list" } as any); break;
-      case "anythingllm_export": result = await anythingllmTool({ ...(args as any), action: "export" } as any); break;
-      case "anythingllm_export_all": result = await anythingllmTool({ ...(args as any), action: "export-all" } as any); break;
+      case "wiki":
+        result = await wikiTool(args as any);
+        break;
+      case "wiki_ingest":
+        result = await wikiIngestTool(args as any);
+        break;
+      case "rag":
+        result = await ragTool(args as any);
+        break;
+      case "planner":
+        result = await plannerTool(args as any);
+        break;
+      case "compact":
+        result = await compactTool(args as any);
+        break;
+      case "anythingllm":
+        result = await anythingllmTool(args as any);
+        break;
       case "notify":
         result = await notifyTool(args as any);
         break;
@@ -407,7 +375,7 @@ async function main() {
     shuttingDown = true;
     console.error(`[MCP] shutdown triggered by ${reason}, cleaning background jobs`);
     Promise.resolve()
-      .then(() => execCleanTool({ all: true } as any))
+      .then(() => execJobTool({ action: "clean", all: true } as any))
       .catch(() => undefined)
       .finally(() => {
         setTimeout(() => process.exit(0), 200);
