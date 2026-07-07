@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from 
 import { join } from "path";
 import { wrapWithInstruction } from "../utils/resultWrapper.js";
 import { LIMITS } from "../utils/truncate.js";
+import { checkCommandSafety } from "./exec-safety.js";
 
 interface ExecArgs {
   command: string;
@@ -25,6 +26,17 @@ function getBgDir(): string {
 export async function execTool(args: ExecArgs): Promise<any> {
   const { command, workdir, timeout = DEFAULT_TIMEOUT, background: bgFlag, env, action } = args;
   const background = bgFlag === true || action === "background";
+
+  if (process.env.AURA_DISABLE_EXEC_DENYLIST !== "1") {
+    const safety = checkCommandSafety(command);
+    if (!safety.ok) {
+      return {
+        content: [{ type: "text", text: `Refused: ${safety.reason}` }],
+        isError: true,
+      };
+    }
+  }
+
   const clampedTimeout = Math.min(Math.max(timeout, 1), MAX_TIMEOUT);
 
   const options: SpawnOptions = {
