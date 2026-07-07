@@ -10,8 +10,8 @@ interface ListDirArgs {
 }
 
 /**
- * Alias for filesystem-list-directory.
- * Lists files and directories, skips hidden entries.
+ * Lists files and directories, skips hidden entries. Several parameter
+ * aliases are accepted so different host invocations map onto the same call.
  */
 export async function listDirTool(args: ListDirArgs): Promise<any> {
   const dirPath = resolveWorkspacePath(args.path || args.directory || args.folder || args.dir || ".");

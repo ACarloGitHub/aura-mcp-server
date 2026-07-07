@@ -16,8 +16,8 @@ interface EditArgs {
 }
 
 /**
- * Alias for filesystem-edit-text-file.
- * Supports all parameter variants that AnythingLLM may use.
+ * Edit accepts several parameter aliases so different host invocations of
+ * `file(action=edit, ...)` map onto the same underlying implementation.
  */
 export async function editTool(args: EditArgs): Promise<any> {
   const filePath = resolveWorkspacePath(args.path || args.file_path || "");

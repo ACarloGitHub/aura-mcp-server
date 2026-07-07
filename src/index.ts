@@ -355,7 +355,7 @@ async function isAnythingLLMForeground(): Promise<boolean> {
 // Debounce: max 1 notification every 8 seconds
 let lastAutoNotifyTime = 0;
 // Tools that should NOT trigger autoNotify (too frequent or already handled)
-const SILENT_TOOLS = new Set(["read", "list_dir", "filesystem-read-text-file", "filesystem-list-directory", "notify", "exec_poll", "exec_list", "exec_clean"]);
+const SILENT_TOOLS = new Set(["file", "exec_job", "notify"]);
 
 // ============================================================
 // autoNotify function (fire-and-forget, with debounce and tool filter)
