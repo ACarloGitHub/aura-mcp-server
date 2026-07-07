@@ -1,7 +1,7 @@
 {
   "name": "aura-mcp-server",
-  "version": "2.1.0",
-  "description": "Cross-platform MCP server for AnythingLLM / LM Studio — file system, shell, wiki, RAG, planner, web search and AnythingLLM integration tools.",
+  "version": "3.0.0",
+  "description": "Cross-platform MCP server for AnythingLLM / LM Studio — file system, shell, wiki, RAG, planner, web search and AnythingLLM integration tools. Consolidates 39 granular tools into 11.",
   "main": "dist/index.js",
   "type": "module",
   "engines": {
