@@ -1,0 +1,31 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capabilities for the AuraMCP Control Panel window: dialogs, shell open, and custom IPC commands.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:window:default",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-close",
+    "core:window:allow-set-focus",
+    "core:webview:default",
+    "core:app:default",
+    "dialog:default",
+    "opener:default",
+    "opener:allow-open-path",
+    {
+      "identifier": "shell:allow-open",
+      "allow": [
+        {
+          "name": "opener",
+          "cmd": "opener",
+          "args": ["{path}"],
+          "sidecar": false
+        }
+      ]
+    }
+  ]
+}

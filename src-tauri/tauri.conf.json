@@ -13,14 +13,16 @@
     "windows": [
       {
         "label": "main",
-        "title": "AuraMCP",
-        "width": 1,
-        "height": 1,
-        "visible": false,
-        "decorations": false,
-        "center": false,
-        "resizable": false,
-        "skipTaskbar": true
+        "title": "AuraMCP Control Panel",
+        "width": 520,
+        "height": 640,
+        "minWidth": 440,
+        "minHeight": 540,
+        "visible": true,
+        "decorations": true,
+        "center": true,
+        "resizable": true,
+        "skipTaskbar": false
       }
     ],
     "security": {
