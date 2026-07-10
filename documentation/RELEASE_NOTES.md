@@ -14,11 +14,13 @@ It unifies three fixes that were left as known issues after v3.1.0:
    panel with copy-to-clipboard JSON templates filled in with the
    user's actual install paths.
 
-This release also adds proper Windows uninstall support: the MSI/NSIS
-uninstaller (which has always been auto-generated) now asks the user
-whether to also remove the per-user data directory
-(`%APPDATA%\com.auramcp.server`), and a new "Uninstall AuraMCP…"
-button in the Control Panel launches it on demand.
+This release also adds proper Windows uninstall support: a new
+"Uninstall AuraMCP…" button in the Control Panel launches the
+auto-generated MSI / NSIS uninstaller. The uninstall behaviour is
+"soft" by default (preserves the per-user data directory so a future
+reinstall can reuse the embedding model); full removal is documented
+in `documentation/setup.md` and via the Control Panel's Uninstaller
+button.
 
 ### Highlights
 
@@ -38,9 +40,6 @@ button in the Control Panel launches it on demand.
   "Copy to clipboard" button. AnythingLLM tab also documents
   `anythingllm.autoStart: false` for resource-constrained setups.
 - **Windows uninstaller enhanced**:
-  - `src-tauri/windows/hooks.nsh` adds `NSIS_HOOK_POSTUNINSTALL`
-    that prompts to remove `%APPDATA%\com.auramcp.server` (default:
-    No, so a reinstall can reuse the embedding model).
   - The Control Panel has a "Uninstall AuraMCP…" button that spawns
     `<install_dir>\uninstall.exe` (NSIS-generated) and exits the
     launcher so the uninstaller can replace files.
@@ -86,7 +85,6 @@ button in the Control Panel launches it on demand.
 - `src-tauri/dist/style.css`
 - `src-tauri/dist/app.js`
 - `src-tauri/capabilities/default.json` (dialog/opener/window permissions)
-- `src-tauri/windows/hooks.nsh` (NSIS post-uninstall hook)
 
 ### Notes
 
