@@ -23,6 +23,7 @@ const els = {
   anythingllmNoAutoStartJson: $("anythingllm-noautostart-json"),
   chkQuitOnClose: $("chk-quit-on-close"),
   btnBrowse: $("btn-browse"),
+  btnUninstall: $("btn-uninstall"),
   downloadOverlay: $("download-overlay"),
   progressBar: $("progress-bar"),
   progressLabel: $("progress-label"),
@@ -282,6 +283,29 @@ function setupButtons() {
       await invoke("set_quit_on_close", { quit: els.chkQuitOnClose.checked });
     } catch (e) {
       console.error("set_quit_on_close", e);
+    }
+  });
+
+  els.btnUninstall.addEventListener("click", async () => {
+    if (
+      !confirm(
+        "Uninstall AuraMCP?\n\nOn Windows the bundled uninstaller will start; it asks whether to remove your local data too.\n\nOn macOS / Linux this will open the standard system uninstall flow.",
+      )
+    ) {
+      return;
+    }
+    els.btnUninstall.disabled = true;
+    try {
+      await invoke("uninstall_app");
+      // On Windows the launcher exits by itself after spawning the
+      // uninstaller, so we never reach this line in practice. The
+      // catch below is for macOS / Linux where the backend returns an
+      // error explaining the user must do it manually.
+    } catch (e) {
+      alert(
+        `Self-uninstall is not available on this platform.\n\n${e}\n\nSee the "Uninstall" section of documentation/setup.md for the manual steps.`,
+      );
+      els.btnUninstall.disabled = false;
     }
   });
 }

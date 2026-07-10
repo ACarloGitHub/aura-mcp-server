@@ -164,6 +164,25 @@ button.secondary {
   border-color: var(--border);
 }
 
+button.danger {
+  background: transparent;
+  border-color: var(--red);
+  color: var(--red);
+}
+
+button.danger:hover {
+  background: rgba(226, 89, 89, 0.12);
+  border-color: var(--red);
+}
+
+.danger-card {
+  border-color: rgba(226, 89, 89, 0.3);
+}
+
+.danger-card h2 {
+  color: var(--red);
+}
+
 button.link-btn {
   background: transparent;
   border: none;

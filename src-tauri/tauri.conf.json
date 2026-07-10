@@ -51,6 +51,11 @@
       "../vendor/llama.cpp/linux/*"
     ],
     "externalBin": [],
+    "windows": {
+      "nsis": {
+        "installerHooks": "./windows/hooks.nsh"
+      }
+    },
     "createUpdaterArtifacts": false
   }
 }

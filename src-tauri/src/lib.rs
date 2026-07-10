@@ -225,6 +225,46 @@ fn hide_window(app: AppHandle) {
     }
 }
 
+/// Reports whether the launcher can spawn a platform-native uninstaller on its own.
+/// Currently: only Windows. macOS / Linux return `false` and the frontend falls back
+/// to a documentation hint.
+#[tauri::command]
+fn can_self_uninstall() -> bool {
+    cfg!(target_os = "windows")
+}
+
+/// Spawns the platform-native uninstaller (Windows only) and exits the launcher.
+/// Returns an error string on macOS / Linux so the frontend can fall back to docs.
+#[tauri::command]
+fn uninstall_app(app: AppHandle) -> Result<(), String> {
+    stop_mcp_child();
+    #[cfg(target_os = "windows")]
+    {
+        let install = launcher_install_dir(&app);
+        let uninstaller = install.join("uninstall.exe");
+        if !uninstaller.is_file() {
+            return Err(format!(
+                "Uninstaller not found at {}. Use Windows Settings → Apps to uninstall AuraMCP.",
+                uninstaller.display()
+            ));
+        }
+        Command::new(&uninstaller)
+            .spawn()
+            .map_err(|e| format!("failed to launch uninstaller: {e}"))?;
+        // Give the uninstaller a moment to acquire focus, then exit so it can
+        // replace the launcher's files.
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(400));
+            app.exit(0);
+        });
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Self-uninstall is not implemented for this platform. Please use the standard OS uninstall flow (see setup.md).".to_string())
+    }
+}
+
 // ---------- node / mcp child ----------
 
 fn find_node() -> Option<String> {
@@ -557,6 +597,8 @@ pub fn run() {
             set_quit_on_close,
             show_window,
             hide_window,
+            can_self_uninstall,
+            uninstall_app,
             mcp_status,
         ])
         .setup(|app| {

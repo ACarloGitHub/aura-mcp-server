@@ -177,6 +177,81 @@ npm run build
 
 Then restart the host application (or close and reopen the MCP panel).
 
+## Uninstall
+
+Uninstall behaviour differs by platform. The AuraMCP Control Panel's
+**Uninstall AuraMCP…** button automates the workflow where possible
+(Windows only); for macOS / Linux follow the steps below.
+
+### Windows
+
+The MSI / NSIS installers register an uninstaller with Windows:
+
+- **Settings → Apps → Installed apps → AuraMCP → Uninstall**, or
+- **Control Panel → Programs and Features → AuraMCP → Uninstall**
+
+You can also launch it from the Control Panel or by running
+`<install_dir>\uninstall.exe` (where `<install_dir>` is shown at the
+bottom of the AuraMCP window).
+
+The uninstaller removes the launcher, the bundled llama.cpp binaries,
+the tray icon, and the start-menu entry. **Your workspace and the
+downloaded embedding model are kept by default.** At the end of
+uninstall a dialog asks whether to also delete
+`%APPDATA%\com.auramcp.server\` — choose **Yes** for a complete clean,
+**No** if you plan to reinstall later.
+
+To remove the data manually afterwards, delete the directory:
+
+```powershell
+Remove-Item -Recurse -Force "$env:APPDATA\com.auramcp.server"
+```
+
+### macOS
+
+There is no dedicated uninstaller bundle. To uninstall:
+
+1. Quit AuraMCP from the tray menu (Quit AuraMCP).
+2. Move `AuraMCP.app` from `/Applications` to the Trash.
+3. Empty the Trash.
+4. Optionally remove your per-user data:
+
+```bash
+rm -rf "$HOME/Library/Application Support/com.auramcp.server"
+```
+
+### Linux
+
+The `.deb` and `.rpm` packages register with the system package manager.
+
+- **Debian / Ubuntu**: `sudo apt remove auramcp` (keeps config) or
+  `sudo apt purge auramcp` (also removes config from `/etc`).
+- **Fedora / RHEL**: `sudo dnf remove auramcp`.
+
+The packages do **not** touch `~/.local/share/com.auramcp.server/`
+(per-user data — the workspace, embedding model, RAG index, logs).
+To remove it:
+
+```bash
+rm -rf "$HOME/.local/share/com.auramcp.server"
+```
+
+### What gets removed vs kept
+
+| Path | Removed by uninstaller? |
+|---|---|
+| Application binary + bundled llama.cpp + tray / start-menu entries | **Yes** (all platforms) |
+| Tray / start-menu entries | **Yes** (Windows) |
+| `<install_dir>/dist/index.js` | **Yes** (all platforms) |
+| Workspace (`MEMORY.md`, `Wiki/`, `plans/`, `compacted-sessions/`) | **No** by default — manual cleanup required |
+| Downloaded embedding model (`nomic-embed-text-v2-moe.Q8_0.gguf`, ~488 MB) | **No** by default — manual cleanup required |
+| RAG sqlite-vec index | **No** by default — manual cleanup required |
+| `mcp-server.log` | **No** by default — manual cleanup required |
+
+The default behaviour preserves your data so a future reinstall can
+reuse the embedding model (saving the ~488 MB download) and any
+workspace state.
+
 ## Troubleshooting
 
 - **Server does not start** — open the host's MCP panel and check the
