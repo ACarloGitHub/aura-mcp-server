@@ -42,11 +42,7 @@ if ! command -v npm &> /dev/null; then
 fi
 echo "[OK] npm found: $(npm --version)"
 
-if command -v python3 &> /dev/null; then
-  echo "[OK] Python found: $(python3 --version)"
-else
-  echo "[WARN] Python3 not found. The RAG tool requires Python with chromadb."
-fi
+# RAG is Python-free; only the GGUF model is downloaded by install_embeddings.
 
 # --- Install + build ---
 echo
@@ -58,7 +54,7 @@ echo "[INFO] Compiling TypeScript..."
 npm run build
 
 echo
-echo "[INFO] Downloading llama.cpp + nomic-embed-text-v1.5 GGUF for RAG..."
+echo "[INFO] Downloading nomic-embed-text-v2-moe GGUF for RAG (Python-free)..."
 bash "${PROJECT_ROOT}/scripts/install_embeddings.sh" || \
   echo "[WARN] Embeddings download skipped or failed. Re-run scripts/install_embeddings.sh manually later."
 

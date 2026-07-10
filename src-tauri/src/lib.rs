@@ -15,16 +15,77 @@ fn start_mcp_child(app: &tauri::AppHandle) -> Result<(), String> {
     let node = node.ok_or_else(|| "node (>=18) not found in PATH".to_string())?;
     let index_js = index_js.ok_or_else(|| "dist/index.js not found beside the launcher".to_string())?;
 
-    let child = Command::new(&node)
-        .arg(&index_js)
+    let mut cmd = Command::new(&node);
+    cmd.arg(&index_js)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .stdin(Stdio::null())
+        .stdin(Stdio::null());
+
+    // Tell the Node MCP server where the downloaded nomic GGUF lives.
+    let gguf = nomic_target(app);
+    if gguf.exists() {
+        cmd.env("EMBED_GGUF", &gguf);
+    }
+
+    // Tell the Node MCP server where the bundled llama-server binary lives.
+    if let Some(bin) = find_llama_server(app) {
+        cmd.env("LLAMACPP_BIN", &bin);
+    }
+
+    let child = cmd
         .spawn()
         .map_err(|e| format!("failed to spawn node: {e}"))?;
 
     *MCP_CHILD.lock().unwrap() = Some(child);
     Ok(())
+}
+
+/// Locate the bundled `llama-server` binary: first in the Tauri resource
+/// directory (packaged app), then in the dev vendor tree.
+fn find_llama_server(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
+    let exe_name = if cfg!(windows) { "llama-server.exe" } else { "llama-server" };
+
+    let candidates: Vec<std::path::PathBuf> = if let Ok(res) = app.path().resource_dir() {
+        let plat = if cfg!(target_os = "windows") {
+            "windows"
+        } else if cfg!(target_os = "macos") {
+            "macos"
+        } else {
+            "linux"
+        };
+        vec![
+            res.join("vendor").join("llama.cpp").join(plat).join(exe_name),
+            res.join(plat).join(exe_name),
+            res.join(exe_name),
+        ]
+    } else {
+        vec![]
+    };
+
+    for c in &candidates {
+        if c.is_file() {
+            return Some(c.clone());
+        }
+    }
+
+    // Dev fallback: project tree vendor dir.
+    let dev_plat = if cfg!(target_os = "windows") {
+        "windows"
+    } else if cfg!(target_os = "macos") {
+        "macos"
+    } else {
+        "linux"
+    };
+    for rel in &[
+        format!("vendor/llama.cpp/{}/{}", dev_plat, exe_name),
+        format!("../vendor/llama.cpp/{}/{}", dev_plat, exe_name),
+    ] {
+        let p = std::path::Path::new(rel);
+        if p.is_file() {
+            return Some(p.to_path_buf());
+        }
+    }
+    None
 }
 
 fn stop_mcp_child() {

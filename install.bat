@@ -61,16 +61,10 @@ if errorlevel 1 (
 for /f "tokens=*" %%a in ('npm --version') do set NPM_VER=%%a
 echo [OK] npm found: %NPM_VER%
 
-python --version > nul 2>&1
-if errorlevel 1 (
-    echo [WARN] Python not found. The RAG tool requires Python with chromadb.
-) else (
-    for /f "tokens=*" %%a in ('python --version') do set PY_VER=%%a
-    echo [OK] Python found: %PY_VER%
-)
+REM --- RAG is Python-free; only the GGUF model is downloaded on first use ---
+echo.
 
 REM --- Install dependencies + build ---
-echo.
 echo [INFO] Installing npm dependencies...
 npm install
 if errorlevel 1 (
@@ -92,7 +86,7 @@ echo [OK] Build completed.
 
 REM --- Optional embeddings setup ---
 echo.
-echo [INFO] Downloading llama.cpp + nomic-embed-text-v1.5 GGUF for RAG...
+echo [INFO] Downloading nomic-embed-text-v2-moe GGUF for RAG (Python-free)...
 call scripts\install_embeddings.bat
 if errorlevel 1 (
     echo [WARN] Embeddings download skipped or failed. You can run scripts\install_embeddings.bat manually later.

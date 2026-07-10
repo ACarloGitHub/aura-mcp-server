@@ -1,7 +1,5 @@
-import { homedir } from "os";
 import { fileURLToPath } from "url";
-import { join, resolve, dirname, normalize as pathNormalize } from "path";
-import { existsSync } from "fs";
+import { resolve, dirname, normalize as pathNormalize } from "path";
 
 /**
  * Detect if running under WSL (Windows Subsystem for Linux).
@@ -136,86 +134,4 @@ export function isBinaryBuffer(buf: Buffer, sampleSize = 512): boolean {
     if (sample[i] === 0) return true;
   }
   return false;
-}
-
-/**
- * Find python3 or python in the system PATH.
- * Runs 'where' on Windows or 'which' on Unix.
- */
-function findPythonInPath(): string | null {
-  try {
-    const { execSync } = require("child_process");
-    const cmd = process.platform === "win32" ? "where python" : "which python3 || which python";
-    const result = execSync(cmd, { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] });
-    const lines = result.trim().split(/\r?\n/).filter(Boolean);
-    for (const line of lines) {
-      const candidate = line.trim();
-      if (existsSync(candidate)) return candidate;
-    }
-  } catch {
-    // ignore
-  }
-  return null;
-}
-
-/**
- * Check if a python executable exists and can import chromadb.
- */
-function isPythonUsable(pythonPath: string): boolean {
-  if (!existsSync(pythonPath)) return false;
-  try {
-    const { execSync } = require("child_process");
-    execSync(`"${pythonPath}" -c "import chromadb"`, { stdio: "ignore", timeout: 5000 });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Resolve the Python path for RAG from env or search common locations.
- * Supports WSL, Windows, Linux, macOS.
- * Priority:
- *   1. env RAG_PYTHON_PATH
- *   2. .venv/Scripts/python.exe (Windows) or .venv/bin/python (Unix) if exists
- *   3. python/python3 found in PATH if it has chromadb
- *   4. Fails with readable error if none works.
- */
-export function getPythonPath(): string {
-  if (process.env.RAG_PYTHON_PATH) {
-    if (isPythonUsable(process.env.RAG_PYTHON_PATH)) {
-      return process.env.RAG_PYTHON_PATH;
-    }
-    console.error(`[WARN] RAG_PYTHON_PATH is set but invalid: ${process.env.RAG_PYTHON_PATH}`);
-  }
-
-  // @ts-ignore
-  const distDir = dirname(fileURLToPath(import.meta.url));
-  const serverDir = dirname(distDir);
-  const workspaceRoot = resolve(serverDir, "..");
-
-  const candidates = [
-    join(workspaceRoot, ".venv", "Scripts", "python.exe"),   // Windows venv
-    join(workspaceRoot, ".venv", "bin", "python3"),           // Unix venv
-    join(workspaceRoot, ".venv", "bin", "python"),              // Unix venv alt
-    join(serverDir, ".venv", "Scripts", "python.exe"),        // Windows (server dir)
-    join(serverDir, ".venv", "bin", "python3"),               // Unix (server dir)
-    join(serverDir, ".venv", "bin", "python"),                  // Unix (server dir alt)
-  ];
-
-  for (const candidate of candidates) {
-    if (isPythonUsable(candidate)) {
-      return candidate;
-    }
-  }
-
-  // Search in PATH
-  const pathPython = findPythonInPath();
-  if (pathPython && isPythonUsable(pathPython)) {
-    return pathPython;
-  }
-
-  // Last fallback: try generic commands (may fail at runtime)
-  const generic = process.platform === "win32" ? "python" : "python3";
-  return generic;
 }

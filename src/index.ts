@@ -20,6 +20,7 @@ import { anythingllmTool } from "./tools/anythingllm.js";
 import { sendWinRTToast, notifyTool } from "./tools/notify.js";
 import { appendLogWithRotation } from "./utils/helpers.js";
 import { resolveAllowedPaths, enabledCategories } from "./utils/sandbox.js";
+import { stopEmbeddingServer, registerShutdownHook } from "./rag/llamaserver.js";
 
 // ============================================================
 // No aliases exposed. tools/list contains only canonical names.
@@ -173,7 +174,7 @@ let TOOLS: Tool[] = [
   },
   {
     name: "rag",
-    description: "Semantic search and document management over ChromaDB collections. Use for: context by meaning.",
+    description: "Semantic search and document management over a native sqlite-vec index. Use for: context by meaning.",
     inputSchema: {
       type: "object",
       properties: {
@@ -394,7 +395,7 @@ function autoNotify(name: string, rawResult: any): void {
 const server = new Server(
   {
     name: "auramcp-server",
-    version: "3.0.0",
+    version: "3.1.0",
   },
   {
     capabilities: {
@@ -515,6 +516,7 @@ async function main() {
       .then(() => execJobTool({ action: "clean", all: true } as any))
       .catch(() => undefined)
       .finally(() => {
+        stopEmbeddingServer();
         setTimeout(() => process.exit(0), 200);
       });
   };
@@ -522,6 +524,8 @@ async function main() {
   process.stdin.on("close", () => cleanupAndExit("stdin close"));
   process.on("SIGTERM", () => cleanupAndExit("SIGTERM"));
   process.on("SIGINT", () => cleanupAndExit("SIGINT"));
+
+  registerShutdownHook();
 
   const enabled = enabledCategories(TOOLS.map((t) => t.name));
   if (enabled !== null) {
@@ -532,7 +536,7 @@ async function main() {
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("AuraMCP Server v3.0 started on stdio");
+  console.error("AuraMCP Server v3.1 started on stdio");
 }
 
 main().catch((error) => {

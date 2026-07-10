@@ -42,16 +42,17 @@ Otherwise the call returns `isError: true` with a `Sandbox: ...` message.
 |---|---|---|
 
 
-## RAG (ChromaDB + llama.cpp embeddings)
+## RAG (native sqlite-vec + llama.cpp embeddings)
 
-The embedding server is the CPU-only `llama.cpp` build started by `scripts/start_embeddings.sh` (POSIX) or `scripts\start_embeddings.bat` (Windows). Run `scripts/install_embeddings.*` once to download llama.cpp and the `nomic-embed-text-v1.5.Q4_K_M` GGUF into `vendor/llama.cpp/` and `embeddings/`.
+The RAG runs **without Python**: vectors are stored in a native `sqlite-vec` index, and embeddings are produced by a CPU-only `llama.cpp` (`llama-server --embedding`) that the Node MCP server starts automatically on first use (port 11434 by default) and stops on exit. Run `scripts/install_embeddings.*` once to download the `nomic-embed-text-v2-moe.Q8_0` GGUF into `embeddings/`; `llama.cpp` is already vendored in `vendor/llama.cpp/`.
 
 | Variable | Default | Description |
 |---|---|---|
-| `RAG_PYTHON_PATH` | auto-detected | Python executable with chromadb installed. |
-| `CHROMA_DATA_DIR` | `{server_dir}/rag/chroma_data` | ChromaDB persistence directory. |
-| `EMBED_URL` | `http://127.0.0.1:8081` | Endpoint of the local llama.cpp embedding server. |
-| `EMBED_MODEL` | `nomic-embed-text-v1.5` | Identifier sent in the embedding request body. |
+| `LLAMACPP_BIN` | auto-detected | Path to the `llama-server` embedding binary (vendored). |
+| `EMBED_GGUF` | auto-detected | Path to the `nomic-embed-text-v2-moe.Q8_0.gguf` model. |
+| `EMBED_URL` | `http://127.0.0.1:11434` | Base URL of the local embedding server. |
+| `EMBED_HOST` / `EMBED_PORT` | `127.0.0.1` / `11434` | Embedding server bind address. |
+| `RAG_DATA_DIR` | `{server_dir}/rag/rag_data` | sqlite-vec vector index directory. |
 
 ## LM Studio
 

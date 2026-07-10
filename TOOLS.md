@@ -84,13 +84,13 @@ Curate the structured knowledge graph (Karpathy-style).
 { "action": "search|add|list|delete|collections|ingest_sessions", "collection": "...", "query": "...", "id": "...", "text": "...", "metadata": "...", "limit": 5, "filter": "..." }
 ```
 
-Semantic search via ChromaDB over documents, with embeddings computed by a local `llama.cpp` server running `nomic-embed-text-v1.5`. See `scripts/install_embeddings.*` for setup.
+Semantic search via a native `sqlite-vec` index, with embeddings computed by a local CPU-only `llama.cpp` (`llama-server --embedding`) running `nomic-embed-text-v2-moe`. **No Python required.** The Node MCP server starts/stops the embedding backend automatically. See `scripts/install_embeddings.*` to download the GGUF model.
 
 - `search`: returns chunks ordered by distance. Snippet per chunk capped at 500 chars (`LIMITS.ragChunk`). `structuredContent` carries `{ collection, query, count, results: [{text,distance,metadata}] }`.
-- `add`/`delete`: idempotent on document ID.
+- `add`/`delete`: idempotent on document ID; long documents are chunked automatically.
 - `list`: lists documents in a collection.
 - `collections`: lists all collections.
-- `ingest_sessions`: indexes AnythingLLM session exports; re-index with `reindex: true`.
+- `ingest_sessions`: indexes LM Studio sessions (parsed natively); re-index with `reindex: true`.
 
 ## planner
 

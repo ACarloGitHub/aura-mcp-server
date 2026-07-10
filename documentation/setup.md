@@ -7,7 +7,7 @@ This document covers installing AuraMCP Server v3.0 and wiring it into either An
 - Node.js 18+
 - AnythingLLM Desktop 1.8+ **or** LM Studio 0.3.17+
 - A workspace directory (any empty folder; the agent will populate it on first boot)
-- Optional: Python 3 + `chromadb` (for RAG). The embedder is the local `llama.cpp` server with a `nomic-embed-text-v1.5` GGUF downloaded by `scripts/install_embeddings.*` (only for the `rag` tool).
+- Optional (RAG only): the `nomic-embed-text-v2-moe.Q8_0` GGUF downloaded by `scripts/install_embeddings.*`. No Python is required — RAG is native (sqlite-vec + bundled CPU `llama.cpp`).
 
 ## Clone and Build
 
@@ -94,8 +94,9 @@ Then restart the host application (or just close and reopen the Agent Skills pag
 
 ## Troubleshooting
 
-- **Server does not start**: check stderr for `AuraMCP Server v3.0 started on stdio`. If you don't see that line within a few seconds of opening the host, the path or env is wrong.
+- **Server does not start**: check stderr for `AuraMCP Server v3.1 started on stdio`. If you don't see that line within a few seconds of opening the host, the path or env is wrong.
 - **`Unknown tool: <name>`**: the host is calling a v2.x granular name. Hosts update automatically when they reload the descriptor list; just close and reopen the agent panel.
 - **`Sandbox: Path outside AGENT_WORKSPACE ...`**: the model tried to read or write outside the workspace. Either fix the prompt or add the path to `AURA_ALLOWED_PATHS`.
 - **DuckDuckGo CAPTCHA**: rare; wait a few minutes before retrying.
-- **RAG fails with `chromadb not found`**: install with `pip install chromadb`. Confirm the python that owns the package matches `RAG_PYTHON_PATH`.
+- **RAG fails with `Embedding backend not found`**: run `scripts/install_embeddings.sh` / `.bat` to download the nomic GGUF, or set `EMBED_GGUF` to an existing model path. No Python is required.
+- **RAG fails with `Embedding model not found`**: the `nomic-embed-text-v2-moe.Q8_0.gguf` is missing. Download it with the install script.

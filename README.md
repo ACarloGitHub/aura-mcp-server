@@ -29,7 +29,7 @@ A powerful [MCP](https://modelcontextprotocol.io) server for [AnythingLLM](https
 | 📚 **Wiki** | Full [Karpathy-style wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) with summaries, concepts, entities, syntheses. |
 | 📋 **Planner** | Phased project plans with checklists and blocking questions. |
 | 📦 **Session Compaction** | Compact long conversations into summaries. Start fresh without losing context. |
-| 🔎 **RAG** | Semantic search via ChromaDB over sessions and auto-extracted entities. |
+| 🔎 **RAG** | Semantic search via a native TypeScript engine (sqlite-vec) over sessions and auto-extracted entities. No Python. |
 | 💬 **AnythingLLM** | Export chat sessions directly from AnythingLLM API. |
 | 🔔 **Notifications** | Desktop notifications + beep when the agent completes tasks (Windows/Linux/macOS). |
 | 🛠️ **11 Built-in Tools** | `file`, `exec`, `exec_job`, `web_search`, `wiki`, `wiki_ingest`, `rag`, `planner`, `compact`, `anythingllm`, `notify`. |
@@ -38,7 +38,7 @@ A powerful [MCP](https://modelcontextprotocol.io) server for [AnythingLLM](https
 
 - **Node.js** 18+
 - **AnythingLLM** or **LM Studio** 0.3+ (with MCP support)
-- **Python 3** with `chromadb` (for RAG only — optional, included via setup)
+- **No Python required.** RAG runs entirely on native Node (sqlite-vec) + a bundled CPU-only `llama.cpp`.
 
 ## Quick Start
 
@@ -104,9 +104,16 @@ You can also set it via environment variable: `ANYTHINGLLM_API_KEY=your-key`.
 
 ### RAG Setup
 
-RAG runs locally with `nomic-embed-text` via `llama.cpp` (CPU-only, no CUDA required). The setup script (`install.bat` / `install.sh`) provisions both a venv with `chromadb` and a vendored `llama.cpp` runtime plus the embedding model into the project directory — nothing leaves the machine.
+RAG runs **100% locally with zero Python**. Embeddings are produced by `nomic-embed-text-v2-moe` via a CPU-only `llama.cpp` (vendored for Windows/macOS/Linux in `vendor/llama.cpp/`), and stored in a native `sqlite-vec` vector index inside the project directory — nothing leaves the machine.
 
-After the first install no further setup is needed; the server picks up `embeddings/nomic-embed-text-vX.X.X-GGUF.gguf` automatically.
+The Node MCP server starts the embedding backend (`llama-server --embedding`) automatically the first time a `rag` tool is called, and stops it on exit. You only need the GGUF model file present:
+
+```bash
+scripts/install_embeddings.sh   # Linux / macOS / WSL
+scripts\install_embeddings.bat  # Windows
+```
+
+This downloads `embeddings/nomic-embed-text-v2-moe.Q8_0.gguf` (~488 MB). The Tauri desktop launcher performs the same download on first run via a setup wizard. After that, RAG is fully automatic.
 
 ## Tools
 
@@ -118,7 +125,7 @@ After the first install no further setup is needed; the server picks up `embeddi
 | `web_search` | Web search via DuckDuckGo. |
 | `wiki` | Manage the local wiki (search, read, write, list). |
 | `wiki_ingest` | Advanced wiki ingest, lint, index updates. |
-| `rag` | Semantic search using `nomic-embed-text` over ChromaDB collections. |
+| `rag` | Semantic search using a native sqlite-vec engine + `nomic-embed-text-v2-moe`. |
 | `planner` | Create and execute phased plans with blocking questions. |
 | `compact` | Memory compaction + session archiving. |
 | `anythingllm` | Export chat sessions from AnythingLLM API. |
@@ -130,9 +137,13 @@ After the first install no further setup is needed; the server picks up `embeddi
 |----------|---------|-------------|
 | `AGENT_WORKSPACE` | server dir | Working directory. All file ops scoped here. |
 | `ANYTHINGLLM_API_KEY` | — | AnythingLLM API key (or use `api-key.json`) |
-| `RAG_PYTHON_PATH` | auto-detected | Python executable with chromadb installed |
+| `RAG_PYTHON_PATH` | _(removed)_ | RAG is now Python-free. |
+| `LLAMACPP_BIN` | auto-detected | Path to the `llama-server` embedding binary (vendored). |
+| `EMBED_GGUF` | auto-detected | Path to the `nomic-embed-text-v2-moe.Q8_0.gguf` model. |
+| `EMBED_HOST` / `EMBED_PORT` | `127.0.0.1` / `11434` | Embedding server bind address. |
+| `RAG_DATA_DIR` | `{server_dir}/rag/rag_data` | sqlite-vec vector index directory. |
 | `LM_STUDIO_CONVERSATIONS_DIR` | `~/.lmstudio/conversations` | LM Studio sessions directory |
-| `CHROMA_DATA_DIR` | `{server_dir}/rag/chroma_data` | ChromaDB persistence directory |
+| `CHROMA_DATA_DIR` | _(removed)_ | Replaced by `RAG_DATA_DIR` (sqlite-vec index). |
 | `LLAMACPP_BIN` | `{server_dir}/vendor/llama.cpp/build/bin/llama-embedding` | Path to the llama.cpp embedding binary. |
 | `EMBEDDINGS_DIR` | `{server_dir}/embeddings` | Directory containing the GGUF model. |
 | `MCP_DEBUG` | — | Set to `1` for verbose debug logging |
@@ -152,7 +163,7 @@ auramcp-server/
 ├── start.bat / start.sh     # Launch scripts
 ├── src/tools/               # 11 tool implementations in 7 consolidated files
 ├── wiki-template/           # Empty wiki scaffolding (copy to your workspace)
-├── rag/                     # ChromaDB persistence (created on first use)
+├── rag/                     # sqlite-vec vector index (created on first use)
 ├── documentation/           # Detailed docs (committed)
 ├── package.json
 ├── tsconfig.json

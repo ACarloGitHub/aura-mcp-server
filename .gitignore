@@ -4,7 +4,7 @@ dist/
 .DS_Store
 .env
 wiki/raw/*/
-rag/chroma_data/
+rag/rag_data/
 session-exports/
 compacted-sessions/
 

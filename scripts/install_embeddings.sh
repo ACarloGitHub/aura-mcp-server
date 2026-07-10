@@ -1,98 +1,29 @@
 #!/usr/bin/env bash
-# install_embeddings.sh — Download llama.cpp CPU-only runtime + the
-# `nomic-embed-text-v1.5` GGUF embedding model into the project tree.
-# Idempotent: skips a step if the target is already present and matches the
-# expected version. Run from anywhere; uses the project root as base.
-#
-# Outputs:
-#   vendor/llama.cpp/llama-embedding (or llama-server, depending on llama.cpp release)
-#   embeddings/nomic-embed-text-v1.5.Q4_K_M.gguf
-#
-# Tested on Linux x86_64 and macOS arm64. Windows uses install_embeddings.bat.
+# install_embeddings.sh — Download the nomic-embed-text-v2-moe GGUF embedding
+# model into the project tree. llama.cpp (CPU) is already vendored in
+# vendor/llama.cpp/<platform>/, so this script only fetches the model.
+# Idempotent. Run from anywhere; uses the project root as base.
 
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VENDOR_DIR="${PROJECT_ROOT}/vendor/llama.cpp"
 EMB_DIR="${PROJECT_ROOT}/embeddings"
-GGUF_NAME="nomic-embed-text-v1.5.Q4_K_M.gguf"
+GGUF_NAME="nomic-embed-text-v2-moe.Q8_0.gguf"
 GGUF_PATH="${EMB_DIR}/${GGUF_NAME}"
-GGUF_URL="https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF/resolve/main/${GGUF_NAME}"
+GGUF_URL="https://huggingface.co/nomic-ai/nomic-embed-text-v2-moe-GGUF/resolve/main/${GGUF_NAME}"
 
-LLAMACPP_VERSION="b5325"
+mkdir -p "${EMB_DIR}"
 
-mkdir -p "${VENDOR_DIR}" "${EMB_DIR}"
-
-OS="$(uname -s)"
-ARCH="$(uname -m)"
-
-case "${OS}:${ARCH}" in
-  Linux:x86_64)
-    LLAMACPP_ASSET="llama-bin-linux-x64-cpu-${LLAMACPP_VERSION}.zip"
-    ;;
-  Linux:aarch64)
-    LLAMACPP_ASSET="llama-bin-linux-arm64-cpu-${LLAMACPP_VERSION}.zip"
-    ;;
-  Darwin:arm64)
-    LLAMACPP_ASSET="llama-bin-macos-arm64-${LLAMACPP_VERSION}.zip"
-    ;;
-  Darwin:x86_64)
-    LLAMACPP_ASSET="llama-bin-macos-x64-${LLAMACPP_VERSION}.zip"
-    ;;
-  *)
-    echo "[install_embeddings] Unsupported platform: ${OS} ${ARCH}" >&2
-    exit 1
-    ;;
-esac
-
-LLAMACPP_URL="https://github.com/ggml-org/llama.cpp/releases/download/${LLAMACPP_VERSION}/${LLAMACPP_ASSET}"
-
-# llama.cpp binaries for embedding typically come as `llama-server`,
-# `llama-embedding`, etc. inside the zip. We pick whichever the release
-# ships with; both expose the Ollama-compatible /embedding endpoint.
-EMB_BIN="${VENDOR_DIR}/llama-server"
-ALT_BIN="${VENDOR_DIR}/llama-embedding"
-
-install_llamacpp() {
-  if [[ -x "${EMB_BIN}" || -x "${ALT_BIN}" ]]; then
-    echo "[install_embeddings] llama.cpp already present, skipping download."
-    return
-  fi
-  echo "[install_embeddings] Downloading ${LLAMACPP_ASSET}"
-  TMP="$(mktemp -d)"
-  trap "rm -rf ${TMP}" EXIT
-  curl -fsSL -o "${TMP}/llama.zip" "${LLAMACPP_URL}"
-  echo "[install_embeddings] Extracting"
-  (cd "${TMP}" && unzip -q llama.zip)
-  # Layout inside the zip varies by release; find the build dir.
-  BUILD_DIR="$(find "${TMP}" -type d -name 'build' | head -n 1 || true)"
-  if [[ -z "${BUILD_DIR}" ]]; then
-    BUILD_DIR="$(find "${TMP}" -type d -name 'bin' | head -n 1 || true)"
-  fi
-  if [[ -z "${BUILD_DIR}" || ! -d "${BUILD_DIR}" ]]; then
-    echo "[install_embeddings] Could not locate build dir in the archive." >&2
-    exit 1
-  fi
-  cp -R "${BUILD_DIR}/." "${VENDOR_DIR}/"
-  chmod +x "${VENDOR_DIR}/llama-server" "${VENDOR_DIR}/llama-embedding" 2>/dev/null || true
-  echo "[install_embeddings] llama.cpp installed at ${VENDOR_DIR}"
-}
-
-install_model() {
-  if [[ -f "${GGUF_PATH}" ]]; then
-    echo "[install_embeddings] GGUF already present, skipping download."
-    return
-  fi
-  echo "[install_embeddings] Downloading ${GGUF_NAME}"
-  curl -fsSL -o "${GGUF_PATH}" "${GGUF_URL}"
+if [[ -f "${GGUF_PATH}" ]]; then
+  echo "[install_embeddings] GGUF already present, skipping download."
+else
+  echo "[install_embeddings] Downloading ${GGUF_NAME} (~488 MB)"
+  curl -fSL --retry 3 -o "${GGUF_PATH}" "${GGUF_URL}"
   echo "[install_embeddings] Model saved at ${GGUF_PATH}"
-}
-
-install_llamacpp
-install_model
+fi
 
 echo "[install_embeddings] Done."
-echo "  llama.cpp:  ${VENDOR_DIR}"
 echo "  gguf:       ${GGUF_PATH}"
+echo "  llama.cpp:  ${PROJECT_ROOT}/vendor/llama.cpp/"
 echo
-echo "Run scripts/start_embeddings.sh to launch the embedding server."
+echo "The Node MCP server starts llama-server automatically on first RAG use."
