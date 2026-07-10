@@ -29,8 +29,12 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["msi", "nsis", "dmg", "deb", "rpm", "appimage", "app"],
+    "targets": ["msi", "nsis", "dmg", "deb", "rpm", "app"],
     "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico",
       "icons/icon.png"
     ],
     "category": "DeveloperTool",
