@@ -1,102 +1,220 @@
-# Installing v3.0
+# Setup
 
-This document covers installing AuraMCP Server v3.0 and wiring it into either AnythingLLM or LM Studio.
+This document covers installing AuraMCP Server and wiring it into a host
+application (AnythingLLM Desktop or LM Studio).
+
+> **Primary path**: the bundled installer. Download from
+> [GitHub Releases](https://github.com/ACarloGitHub/aura-mcp-server/releases),
+> run it, follow the first-launch dialog. The installer handles everything
+> (embedding model download, server registration, system tray).
+>
+> **Secondary path**: run from source. Documented at the bottom of this file,
+> for developers and contributors.
 
 ## Requirements
 
-- Node.js 18+
-- AnythingLLM Desktop 1.8+ **or** LM Studio 0.3.17+
-- A workspace directory (any empty folder; the agent will populate it on first boot)
-- Optional (RAG only): the `nomic-embed-text-v2-moe.Q8_0` GGUF downloaded by `scripts/install_embeddings.*`. No Python is required — RAG is native (sqlite-vec + bundled CPU `llama.cpp`).
+- **Node.js 18+** — only required for the "run from source" path. The
+  bundled installer embeds Node.js spawning logic but still requires a
+  Node.js runtime to be present on the host machine for the MCP server
+  child process.
+- **AnythingLLM Desktop 1.8+** or **LM Studio 0.3.17+**.
+- **A workspace directory** (any empty folder; the agent populates it
+  on first boot).
 
-## Clone and Build
+## Primary path: bundled installer
 
-```bash
-git clone https://github.com/ACarloGitHub/auramcp-server.git
-cd auramcp-server
-npm install        # or `npm ci` for a reproducible install
-npm run build      # produces dist/index.js
-```
+### 1. Download
 
-### One-line installers
+Grab the latest release for your platform from
+[GitHub Releases](https://github.com/ACarloGitHub/aura-mcp-server/releases/latest):
 
-The repo ships platform-specific installers:
+- **Windows**: `AuraMCP_3.1.0_x64-setup.exe` (NSIS, recommended) or
+  `AuraMCP_3.1.0_x64_en-US.msi` (WiX).
+- **macOS**: `AuraMCP_3.1.0_universal.dmg` (Intel + Apple Silicon).
+- **Linux**: `AuraMCP_3.1.0_amd64.deb` (Debian/Ubuntu) or
+  `AuraMCP-3.1.0-1.x86_64.rpm` (Fedora/RHEL).
 
-- **Windows**: run `install.bat` (creates a desktop shortcut).
-- **Linux / macOS / WSL**: `chmod +x install.sh && ./install.sh`.
+### 2. Install
 
-## Configure Workspace
+Run the installer. It registers AuraMCP in the system and adds a tray
+icon. No further user action needed at this point.
 
-Pick or create an empty workspace folder. The agent will write `SOUL.md`, `MEMORY.md`, `USER.md`, `Wiki/`, `plans/` and `compacted-sessions/` there on first boot.
+### 3. First launch
 
-```bash
-mkdir -p ~/aura-workspace
-```
+The first time `AuraMCP` starts it shows a one-time setup dialog asking
+to download the embedding model (~488 MB). The model is the
+[nomic-embed-text-v2-moe.Q8_0](https://huggingface.co/nomic-ai/nomic-embed-text-v2-moe-GGUF)
+GGUF and is fetched from Hugging Face into the per-user app data
+directory:
 
-Note this path — you'll pass it as `AGENT_WORKSPACE` in the next step.
+- Windows: `%APPDATA%\com.auramcp.server\embeddings\`
+- macOS: `~/Library/Application Support/com.auramcp.server/embeddings/`
+- Linux: `~/.local/share/com.auramcp.server/embeddings/`
+
+After confirming, the server starts in the tray. The download is
+~488 MB and takes a few minutes on a typical connection. RAG is fully
+operational only after this completes; the other 10 tools work
+immediately.
+
+> **Privacy**: the download is the only outbound network call. After
+> that, embeddings are produced by the bundled `llama.cpp` running on
+> `127.0.0.1:11434`. No telemetry, no third-party API calls.
+
+### 4. Wire into your MCP host
+
+The installer creates `dist/index.js` and (on Windows / macOS) registers
+the launcher. You still need to tell your MCP host to spawn it. See
+[Wire into AnythingLLM](#wire-into-anythingllm) or
+[Wire into LM Studio](#wire-into-lm-studio) below.
 
 ## Wire into AnythingLLM
 
-AnythingLLM stores its MCP server list at `<storage>/plugins/anythingllm_mcp_servers.json`. Edit (or create) that file to include:
+AnythingLLM stores its MCP server list at
+`<storage>/plugins/anythingllm_mcp_servers.json`.
+
+`<storage>` depends on the platform:
+
+- **Windows**: `%APPDATA%\anythingllm-desktop\storage\`
+- **macOS**: `~/Library/Application Support/anythingllm-desktop/storage/`
+- **Linux**: `~/.local/share/anythingllm-desktop/storage/`
+
+Edit (or create) the file:
 
 ```json
 {
   "mcpServers": {
     "auramcp-server": {
       "command": "node",
-      "args": ["W:/SviluppoProgetti/auramcp-server/dist/index.js"],
+      "args": ["/path/to/aura-mcp-server/dist/index.js"],
       "env": {
-        "AGENT_WORKSPACE": "W:/SviluppoProgetti/aura-workspace"
+        "AGENT_WORKSPACE": "/path/to/your/workspace"
       }
     }
   }
 }
 ```
 
-Windows: paths use forward slashes for portability. AnythingLLM auto-starts MCP servers when you open the Agent Skills page or invoke `@agent`.
+Replace `/path/to/aura-mcp-server` with the directory where the
+installer placed the project (or where you cloned it), and
+`/path/to/your/workspace` with an empty directory of your choice.
+
+AnythingLLM's MCP Management UI (Settings → MCP Servers) shows all
+detected servers, their status, error logs and lets you reload or
+restart them. If the server appears in the UI but tools are missing,
+reload it from the UI to re-read the file.
+
+To prevent AnythingLLM from auto-starting the server (useful on
+resource-constrained machines), add:
+
+```json
+{
+  "mcpServers": {
+    "auramcp-server": {
+      "command": "node",
+      "args": ["/path/to/aura-mcp-server/dist/index.js"],
+      "env": { "AGENT_WORKSPACE": "/path/to/your/workspace" },
+      "anythingllm": { "autoStart": false }
+    }
+  }
+}
+```
 
 ## Wire into LM Studio
 
-LM Studio stores its MCP config at `~/.lmstudio/mcp.json` (or `%USERPROFILE%\.lmstudio\mcp.json` on Windows):
+LM Studio stores its MCP config at:
+
+- **Windows**: `%USERPROFILE%\.lmstudio\mcp.json`
+- **macOS / Linux**: `~/.lmstudio/mcp.json`
+
+LM Studio 0.3.17+ also exposes an in-app editor: **Program tab →
+Install → Edit mcp.json**. Either edit via the UI or the file directly.
 
 ```json
 {
   "mcpServers": {
     "auramcp-server": {
       "command": "node",
-      "args": ["W:/SviluppoProgetti/auramcp-server/dist/index.js"],
+      "args": ["/path/to/aura-mcp-server/dist/index.js"],
       "env": {
-        "AGENT_WORKSPACE": "W:/SviluppoProgetti/aura-workspace"
+        "AGENT_WORKSPACE": "/path/to/your/workspace"
       }
     }
   }
 }
 ```
 
-LM Studio reads the file whenever you save it. Tools appear under the Program tab and the model's chat confirms via a confirmation dialog before each call.
+LM Studio auto-reloads the file whenever you save it. Tools appear
+under the Program tab; the model's chat shows a confirmation dialog
+before each tool call.
+
+> **Gotcha**: when pasting manually, copy only the content **after**
+> `"mcpServers": {` and **before** the closing `}`. LM Studio merges
+> into the existing top-level key, so a full copy would create a
+> nested `mcpServers` that doesn't work.
 
 ## First Boot
 
-1. Open the host's agent or chat UI.
-2. The model reads `SOUL.md` and asks for name, language, what you want to do.
-3. Begin a chat. Tool calls appear as cards with arguments; LM Studio and AnythingLLM both show a confirmation dialog before each invocation.
+After the host is connected, open its chat UI. The model reads
+`SOUL.md` from the workspace and asks for your name, language, and what
+you want to do. Begin a chat — tool calls appear as cards with
+arguments; both AnythingLLM and LM Studio show a confirmation dialog
+before each invocation.
 
 ## Updating
 
+Grab the new installer from
+[GitHub Releases](https://github.com/ACarloGitHub/aura-mcp-server/releases/latest)
+and run it over the previous install. The installer preserves your
+workspace and embedding model.
+
+To update from a source checkout:
+
 ```bash
-cd auramcp-server
 git pull
-npm ci
+npm install
 npm run build
 ```
 
-Then restart the host application (or just close and reopen the Agent Skills page in AnythingLLM).
+Then restart the host application (or close and reopen the MCP panel).
 
 ## Troubleshooting
 
-- **Server does not start**: check stderr for `AuraMCP Server v3.1 started on stdio`. If you don't see that line within a few seconds of opening the host, the path or env is wrong.
-- **`Unknown tool: <name>`**: the host is calling a v2.x granular name. Hosts update automatically when they reload the descriptor list; just close and reopen the agent panel.
-- **`Sandbox: Path outside AGENT_WORKSPACE ...`**: the model tried to read or write outside the workspace. Either fix the prompt or add the path to `AURA_ALLOWED_PATHS`.
-- **DuckDuckGo CAPTCHA**: rare; wait a few minutes before retrying.
-- **RAG fails with `Embedding backend not found`**: run `scripts/install_embeddings.sh` / `.bat` to download the nomic GGUF, or set `EMBED_GGUF` to an existing model path. No Python is required.
-- **RAG fails with `Embedding model not found`**: the `nomic-embed-text-v2-moe.Q8_0.gguf` is missing. Download it with the install script.
+- **Server does not start** — open the host's MCP panel and check the
+  error log. Most common cause: wrong path in `args` or missing Node.js.
+- **Unknown tool: \<name\>** — the host cached an old tool list. Close
+  and reopen the MCP panel.
+- **Sandbox: Path outside AGENT_WORKSPACE** — the model tried to read
+  or write outside the workspace. Either fix the prompt or add the path
+  to `AURA_ALLOWED_PATHS`.
+- **DuckDuckGo CAPTCHA** — rare; wait a few minutes before retrying.
+- **RAG fails: embedding backend not found** — open the system tray
+  icon, choose "Restart". If the embedding model is missing, the
+  setup dialog re-appears on next launch.
+- **RAG returns no results** — verify the embedding model is present
+  in the per-user app data directory (see step 3 above). The Node
+  server starts the embedding backend on first `rag` tool call and
+  stops it on exit.
+
+## Secondary path: run from source
+
+```bash
+git clone https://github.com/ACarloGitHub/aura-mcp-server.git
+cd aura-mcp-server
+npm install
+npm run build
+node dist/index.js
+```
+
+The server reads `AGENT_WORKSPACE` from the environment (or falls back
+to the current working directory). Point your MCP host at the
+`dist/index.js` file as described above.
+
+This path is intended for development and CI; the bundled installer
+is the supported way for end users.
+
+## See also
+
+- [architecture.md](architecture.md) — pipeline and tool surface.
+- [env-vars.md](env-vars.md) — every environment variable, with
+  precedence rules.
+- [RELEASE_NOTES.md](RELEASE_NOTES.md) — version history.

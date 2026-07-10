@@ -1,4 +1,4 @@
-# Tools (v3.0)
+# Tools (v3.1)
 
 The server exposes 11 tools. Ten take an `action` parameter that selects the operation; `web_search` and `notify` do not.
 
@@ -84,7 +84,7 @@ Curate the structured knowledge graph (Karpathy-style).
 { "action": "search|add|list|delete|collections|ingest_sessions", "collection": "...", "query": "...", "id": "...", "text": "...", "metadata": "...", "limit": 5, "filter": "..." }
 ```
 
-Semantic search via a native `sqlite-vec` index, with embeddings computed by a local CPU-only `llama.cpp` (`llama-server --embedding`) running `nomic-embed-text-v2-moe`. **No Python required.** The Node MCP server starts/stops the embedding backend automatically. See `scripts/install_embeddings.*` to download the GGUF model.
+Semantic search via a native `sqlite-vec` index, with embeddings computed by a local CPU-only `llama.cpp` (`llama-server --embedding`) running `nomic-embed-text-v2-moe`. **No Python required.** The Node MCP server starts/stops the embedding backend automatically. The bundled installer downloads the GGUF model on first launch; from source, set `EMBED_GGUF` to the model path.
 
 - `search`: returns chunks ordered by distance. Snippet per chunk capped at 500 chars (`LIMITS.ragChunk`). `structuredContent` carries `{ collection, query, count, results: [{text,distance,metadata}] }`.
 - `add`/`delete`: idempotent on document ID; long documents are chunked automatically.

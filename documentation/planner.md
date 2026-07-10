@@ -1,4 +1,4 @@
-# Planner (v3.0)
+# Planner (v3.1)
 
 The planner manages phased plans stored as markdown files under `plans/` in the workspace. A plan is a checklist of tasks; some tasks are blocking questions that require user input.
 

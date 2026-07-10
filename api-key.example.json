@@ -1,3 +1,4 @@
 {
+  "_comment": "AnythingLLM API key for the 'anythingllm' tool (chat export). Get your key from AnythingLLM → Settings → API Keys. Copy this file to api-key.json and replace the placeholder. If both this file and the ANYTHINGLLM_API_KEY environment variable are present, the environment variable wins.",
   "anythingllm_api_key": "INSERT-YOUR-ANYTHINGLLM-API-KEY-HERE"
 }

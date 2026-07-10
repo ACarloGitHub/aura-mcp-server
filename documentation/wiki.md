@@ -1,4 +1,4 @@
-# Wiki (v3.0)
+# Wiki (v3.1)
 
 The wiki is a Karpathy-style markdown knowledge base under `Wiki/` inside the workspace. `wiki` action values handle read/write/search/list; `wiki_ingest` handles the structured knowledge-graph side.
 

@@ -1,5 +1,78 @@
 # Release Notes
 
+## v3.1.0 (2026-07-10)
+
+The headline change in v3.1 is a **breaking** RAG rewrite. v3.0's RAG
+required a separate Python installation, ChromaDB and Ollama; v3.1 ships
+RAG as **pure TypeScript** on top of `sqlite-vec` with embeddings
+produced by a bundled CPU-only `llama.cpp` (`nomic-embed-text-v2-moe`).
+**No Python. No external services.**
+
+This release also ships the first **bundled installer** (Tauri) — MSI /
+NSIS / DMG / DEB / RPM that handle the embedding-model download via a
+first-launch wizard and register the server in the system tray.
+
+### Highlights
+
+- **RAG is now Python-free.** The `src/rag/` module replaces `rag.py`
+  with a native TypeScript implementation: `sqlite-vec` for the vector
+  index, `better-sqlite3` for chunk metadata, and a vendored CPU-only
+  `llama.cpp` for embeddings. The Node server starts/stops the
+  embedding backend automatically on first `rag` call and on exit.
+- **Embedding model**: `nomic-embed-text-v2-moe.Q8_0.gguf` (~488 MB).
+  Downloaded once on first launch from Hugging Face; afterwards the
+  model lives in the per-user app data directory and never leaves the
+  machine.
+- **Bundled installer** (Tauri) — see the
+  [release assets](https://github.com/ACarloGitHub/aura-mcp-server/releases/tag/v3.1.0):
+  - Windows: `.msi` (WiX) and `.exe` (NSIS)
+  - macOS: universal `.dmg` (Intel + Apple Silicon) and `.app.tar.gz`
+  - Linux: `.deb` and `.rpm`
+- **Tray-resident launcher.** The installer places `AuraMCP` in the
+  system tray. The launcher spawns the Node MCP server, shows first-run
+  setup dialog, registers the embedding model, and stays resident until
+  the user quits from the tray menu.
+- **`/v1/embeddings` OpenAI-compatible endpoint** is what the Node
+  server uses to talk to `llama-server`. llama.cpp's `/api/embeddings`
+  was not used (it 404s on b9680+).
+- **Removed**: `rag.py`, `session_export.py`, the `scripts/` directory,
+  `install.bat`, `install.sh`, `start.bat`, `start.sh`, and the Python
+  helpers from `src/utils/helpers.ts` (`getPythonPath`, `findPythonInPath`,
+  `isPythonUsable`).
+- **Removed env vars**: `RAG_PYTHON_PATH`, `CHROMA_DATA_DIR`,
+  `OLLAMA_EMBED_URL`, `OLLAMA_EMBED_MODEL`, `BRAVE_API_KEY`.
+
+### Embedding endpoint reference
+
+| Endpoint | Status |
+|---|---|
+| `POST /v1/embeddings` | **Used** (OpenAI-compatible, returns `{data: [{embedding: number[]}]}`). |
+| `POST /api/embeddings` | Not used (404 on llama.cpp b9680). |
+| `GET /health` | Used for readiness check. |
+| `GET /api/tags` | Not used (404). |
+
+### Breaking changes from v3.0
+
+- The RAG is now native TypeScript; any external Python integration
+  (custom ChromaDB indexes, Ollama proxies) no longer applies.
+- `EMBED_GGUF` is auto-detected from the per-user app data directory
+  when using the bundled installer. From source, point it at the GGUF
+  manually.
+- `RAG_DATA_DIR` now points at the workspace's `rag/rag_data/`
+  directory (was previously `rag/chroma_data/`).
+
+### Notes
+
+- The bundled installer does **not** sign executables. SmartScreen
+  warnings on Windows and Gatekeeper blocks on macOS are expected.
+  Workaround: right-click → Open / "More info → Run anyway" the first
+  time.
+- The Node MCP server still requires Node.js 18+ on the host machine
+  (the Tauri launcher spawns it as a child process).
+- Linux AppImage was removed from the bundle target because
+  `linuxdeploy` could not bundle the vendored `vendor/llama.cpp/` `.so`
+  files. DEB and RPM remain.
+
 ## v3.0.0 (2026-07-07)
 
 The headline change in v3.0 is a **breaking** consolidation: the v2.x tool surface had 39 granular entries (each function a separate tool name); v3.0 ships **11** consolidated tools, most with an `action` enum.

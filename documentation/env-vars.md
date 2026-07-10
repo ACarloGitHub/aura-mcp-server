@@ -44,7 +44,9 @@ Otherwise the call returns `isError: true` with a `Sandbox: ...` message.
 
 ## RAG (native sqlite-vec + llama.cpp embeddings)
 
-The RAG runs **without Python**: vectors are stored in a native `sqlite-vec` index, and embeddings are produced by a CPU-only `llama.cpp` (`llama-server --embedding`) that the Node MCP server starts automatically on first use (port 11434 by default) and stops on exit. Run `scripts/install_embeddings.*` once to download the `nomic-embed-text-v2-moe.Q8_0` GGUF into `embeddings/`; `llama.cpp` is already vendored in `vendor/llama.cpp/`.
+The RAG runs **without Python**: vectors are stored in a native `sqlite-vec` index, and embeddings are produced by a CPU-only `llama.cpp` (`llama-server --embedding`) that the Node MCP server starts automatically on first use (port 11434 by default) and stops on exit.
+
+The bundled installer downloads the `nomic-embed-text-v2-moe.Q8_0.gguf` model (~488 MB) on first launch into the per-user app data directory. When running from source, place the GGUF anywhere on disk and set `EMBED_GGUF` to its path; `llama.cpp` is vendored in `vendor/llama.cpp/<platform>/`.
 
 | Variable | Default | Description |
 |---|---|---|

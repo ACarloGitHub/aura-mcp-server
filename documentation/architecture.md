@@ -1,4 +1,4 @@
-# Architecture (v3.0)
+# Architecture (v3.1)
 
 AuraMCP Server is a thin TypeScript process that speaks MCP over stdio. The host (AnythingLLM or LM Studio) spawns one instance per workspace and sends JSON-RPC requests.
 

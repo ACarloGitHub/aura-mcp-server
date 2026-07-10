@@ -1,4 +1,4 @@
-# Memory Compaction (v3.0)
+# Memory Compaction (v3.1)
 
 `MEMORY.md` is the agent's working memory: a free-form markdown file in the workspace root. It grows as the agent works. Once it crosses 300 lines, manually or automatically compacting keeps the agent's prompt short.
 
