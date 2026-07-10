@@ -1,5 +1,103 @@
 # Release Notes
 
+## v3.2.0 (2026-07-10)
+
+The headline change in v3.2 is the new **AuraMCP Control Panel** — a
+visible Tauri window that replaces the previous invisible 1x1 launcher.
+It unifies three fixes that were left as known issues after v3.1.0:
+
+1. **Live progress bar for the nomic embedding download** (was
+   stderr-only, invisible to the user).
+2. **Server + RAG status at a glance** (server running, nomic model
+   present, llama-server reachable) with one-click Start / Stop.
+3. **LM Studio / AnythingLLM wiring instructions** built into the
+   panel with copy-to-clipboard JSON templates filled in with the
+   user's actual install paths.
+
+This release also adds proper Windows uninstall support: the MSI/NSIS
+uninstaller (which has always been auto-generated) now asks the user
+whether to also remove the per-user data directory
+(`%APPDATA%\com.auramcp.server`), and a new "Uninstall AuraMCP…"
+button in the Control Panel launches it on demand.
+
+### Highlights
+
+- **Visible Control Panel window** (520x640 px, resizable, dark
+  theme). Opens automatically on launch. Can be closed to the tray;
+  option to quit-on-close in the Options card.
+- **System tray icon** with menu (Open AuraMCP / Quit AuraMCP). Left
+  click on the tray icon shows/focuses the Control Panel.
+- **RAG components** monitored: nomic GGUF presence, llama-server
+  reachability on `127.0.0.1:11434`. Green/yellow/red status dots.
+- **Live download progress** for the embedding model via Tauri events
+  (`nomic-progress`, `nomic-finished`) emitted from Rust; the
+  frontend shows a centered overlay with a progress bar.
+- **LM Studio and AnythingLLM tabs** in the panel: the user sees the
+  exact file path to edit, the JSON to paste (with the launcher's
+  install dir and a default workspace path filled in), and a
+  "Copy to clipboard" button. AnythingLLM tab also documents
+  `anythingllm.autoStart: false` for resource-constrained setups.
+- **Windows uninstaller enhanced**:
+  - `src-tauri/windows/hooks.nsh` adds `NSIS_HOOK_POSTUNINSTALL`
+    that prompts to remove `%APPDATA%\com.auramcp.server` (default:
+    No, so a reinstall can reuse the embedding model).
+  - The Control Panel has a "Uninstall AuraMCP…" button that spawns
+    `<install_dir>\uninstall.exe` (NSIS-generated) and exits the
+    launcher so the uninstaller can replace files.
+- **"Browse server folder" button** opens the launcher's install
+  directory in the platform's file manager (Explorer / Finder /
+  xdg-open).
+- **macOS / Linux uninstall** documented in `setup.md`; the Control
+  Panel button on those platforms opens an alert pointing to the
+  manual steps.
+
+### New IPC commands
+
+| Command | Purpose |
+|---|---|
+| `get_status` | Returns full StatusReport: MCP child PID, RAG state, install paths, quit-on-close flag. |
+| `start_server` | Spawns the Node MCP child. |
+| `stop_server` | Kills the Node MCP child. |
+| `download_nomic` | Triggers the embedding-model download (emits events). |
+| `open_server_folder` | Opens the launcher install dir in the file manager. |
+| `get_install_paths` | Returns paths to fill into the host wiring JSON. |
+| `set_quit_on_close` | Toggles the close-to-tray vs quit-on-close behaviour. |
+| `show_window` / `hide_window` | Programmatic window visibility. |
+| `can_self_uninstall` | Reports whether the platform has a self-uninstall flow. |
+| `uninstall_app` | On Windows: spawn the uninstaller and exit. Otherwise returns an error pointing to docs. |
+
+### New events
+
+| Event | Payload |
+|---|---|
+| `nomic-progress` | `{ downloaded: u64, total: u64, percent: u32 }` |
+| `nomic-finished` | `{ ok: bool, error?: string }` |
+| `server-status` | `{ running: bool }` |
+
+### New Tauri dependencies
+
+- `tauri = { version = "2", features = ["tray-icon"] }` (Cargo.toml)
+- `tauri-plugin-opener = "2"` (for "Browse server folder" on
+  cross-platform file manager invocation)
+
+### Files added
+
+- `src-tauri/dist/index.html` (replaces the previous stub)
+- `src-tauri/dist/style.css`
+- `src-tauri/dist/app.js`
+- `src-tauri/capabilities/default.json` (dialog/opener/window permissions)
+- `src-tauri/windows/hooks.nsh` (NSIS post-uninstall hook)
+
+### Notes
+
+- The new bundle targets do **not** include AppImage (still removed
+  from v3.1). DEB and RPM remain for Linux.
+- The Control Panel only includes JS/CSS/HTML, no framework
+  dependency.
+- For Linux/macOS the uninstaller has to be run via the system
+  package manager / manual drag-to-Trash. The Control Panel button
+  shows the relevant instructions.
+
 ## v3.1.0 (2026-07-10)
 
 The headline change in v3.1 is a **breaking** RAG rewrite. v3.0's RAG
