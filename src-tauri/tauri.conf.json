@@ -40,18 +40,9 @@
     "copyright": "Copyright (c) 2026 ACarloGitHub",
     "homepage": "https://github.com/ACarloGitHub/aura-mcp-server",
     "resources": [
-      {
-        "src": "../vendor/llama.cpp/windows/*",
-        "target": ["msi", "nsis"]
-      },
-      {
-        "src": "../vendor/llama.cpp/macos/*",
-        "target": ["dmg", "app"]
-      },
-      {
-        "src": "../vendor/llama.cpp/linux/*",
-        "target": ["deb", "rpm", "appimage"]
-      }
+      "../vendor/llama.cpp/windows/*",
+      "../vendor/llama.cpp/macos/*",
+      "../vendor/llama.cpp/linux/*"
     ],
     "externalBin": [],
     "createUpdaterArtifacts": false
