@@ -116,8 +116,16 @@ let lastStatus = null;
 let wizardAutoTriggered = false;
 
 async function refreshStatus() {
+  debug("refreshStatus: invoking get_status");
   try {
-    const s = await invoke("get_status");
+    const s = await Promise.race([
+      invoke("get_status"),
+      new Promise((_, rej) =>
+        setTimeout(() => rej(new Error("timeout 8s")), 8000),
+      ),
+    ]);
+    console.log("[AuraMCP] refreshStatus OK:", s);
+    debug("refreshStatus: OK");
     lastStatus = s;
 
     setDot(els.mcpDot, s.mcpRunning ? "ok" : "down");
@@ -141,9 +149,37 @@ async function refreshStatus() {
       startNomicDownload();
     }
   } catch (e) {
-    console.error("refreshStatus failed:", e);
-    els.mcpLabel.textContent = "Status error";
+    console.error("[AuraMCP] refreshStatus failed:", e);
+    debug("refreshStatus FAIL: " + e);
+    els.mcpLabel.textContent = "Status error: " + String(e).slice(0, 80);
+    showToast("Status error: " + String(e), "error");
   }
+}
+
+function debug(s) {
+  try {
+    document.title = "AuraMCP: " + s;
+  } catch {}
+  console.log("[DEBUG]", s);
+}
+
+function showToast(msg, kind = "info") {
+  let bar = document.getElementById("toast-bar");
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "toast-bar";
+    bar.style.cssText =
+      "position:fixed;bottom:14px;right:14px;display:flex;flex-direction:column;gap:8px;z-index:200;max-width:420px;";
+    document.body.appendChild(bar);
+  }
+  const t = document.createElement("div");
+  t.style.cssText =
+    "padding:10px 14px;border-radius:6px;font-size:13px;border:1px solid var(--border);background:var(--bg-card);color:var(--fg);box-shadow:0 4px 12px rgba(0,0,0,0.4);white-space:pre-wrap;word-break:break-word;";
+  if (kind === "error") t.style.borderColor = "var(--red)";
+  if (kind === "ok") t.style.borderColor = "var(--green)";
+  t.textContent = msg;
+  bar.appendChild(t);
+  setTimeout(() => t.remove(), 8000);
 }
 
 async function refreshHostJson() {
@@ -325,18 +361,70 @@ async function setupEvents() {
 }
 
 (async () => {
+  function debug(s) {
+    try {
+      document.title = "AuraMCP: " + s;
+    } catch {}
+    console.log("[DEBUG]", s);
+    try {
+      const w = window.__TAURI__?.window?.getCurrentWindow?.();
+      if (w) w.setTitle("AuraMCP: " + s);
+    } catch {}
+  }
+  debug("boot");
   try {
+    if (!window.__TAURI__) {
+      debug("FATAL: window.__TAURI__ undefined");
+      throw new Error("Tauri API not available — window.__TAURI__ is undefined");
+    }
+    if (!window.__TAURI__.core) {
+      debug("FATAL: window.__TAURI__.core undefined");
+      throw new Error("window.__TAURI__.core is undefined");
+    }
+    debug("tauri API OK");
+
+    // Diagnostic: try built-in command first to validate the channel works
+    try {
+      const v = await Promise.race([
+        invoke("plugin:app|get_version"),
+        new Promise((_, rej) =>
+          setTimeout(() => rej(new Error("app.get_version timeout 5s")), 5000),
+        ),
+      ]);
+      debug("app.get_version OK: " + v);
+      els.version.textContent = "v" + v;
+    } catch (e1) {
+      debug("app.get_version FAIL: " + e1);
+      try {
+        const v2 = await Promise.race([
+          window.__TAURI__.app.getVersion(),
+          new Promise((_, rej) =>
+            setTimeout(() => rej(new Error("alt getVersion timeout 5s")), 5000),
+          ),
+        ]);
+        debug("app.getVersion() OK: " + v2);
+        els.version.textContent = "v" + v2;
+      } catch (e2) {
+        debug("alt getVersion FAIL: " + e2);
+      }
+    }
+
     setupTabs();
     setupCopyButtons();
     setupButtons();
+    debug("buttons set up");
     await setupEvents();
+    debug("events set up");
     await refreshHostJson();
+    debug("host json refreshed");
     await refreshStatus();
+    debug("first status done");
     setInterval(refreshStatus, 5000);
   } catch (e) {
+    debug("INIT FAIL: " + e);
     console.error("init failed:", e);
     document.body.innerHTML =
-      '<pre style="color:#e25959;padding:20px;">Init error: ' +
+      '<pre style="color:#e25959;padding:20px;font-size:12px;">Init error: ' +
       String(e) +
       "</pre>";
   }

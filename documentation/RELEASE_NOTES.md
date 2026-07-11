@@ -1,5 +1,22 @@
 # Release Notes
 
+## v3.2.3 (2026-07-11)
+
+The v3.2.2 release still had a broken Control Panel. The actual
+permission identifier format in Tauri 2 is **`allow-<command>`**
+(with hyphens), NOT just `<command>` or `<prefix>:<command>`.
+
+Each `#[tauri::command]` generates two permission files:
+`<command>.toml` (allow) and `<command>.toml` (deny). The
+`allow-` variant is the one to list in the capability.
+
+Fix in `src-tauri/capabilities/default.json`: replaces the
+incorrect identifiers with the auto-generated `allow-*` ones.
+Now the Control Panel can actually call `get_status`, `start_server`,
+`stop_server`, `download_nomic`, `open_server_folder`,
+`get_install_paths`, `set_quit_on_close`, `show_window`,
+`hide_window`, `can_self_uninstall`, `uninstall_app`, `mcp_status`.
+
 ## v3.2.2 (2026-07-10)
 
 Fixes the v3.2.0/v3.2.1 Control Panel, which was a non-functional

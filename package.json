@@ -1,6 +1,6 @@
 {
   "name": "auramcp-server",
-  "version": "3.2.2",
+  "version": "3.2.3",
   "description": "Cross-platform MCP server for AnythingLLM / LM Studio : file system, shell, wiki, RAG, planner, web search and AnythingLLM integration tools. Consolidates 39 granular tools into 11.",
   "main": "dist/index.js",
   "type": "module",

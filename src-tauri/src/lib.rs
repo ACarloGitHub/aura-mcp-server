@@ -131,6 +131,7 @@ fn mcp_running() -> bool {
 
 #[tauri::command]
 fn get_status(app: AppHandle) -> StatusReport {
+    eprintln!("[AuraMCP IPC] get_status called");
     let install_dir = launcher_install_dir(&app);
     StatusReport {
         mcp_running: mcp_running(),
@@ -150,6 +151,7 @@ fn get_status(app: AppHandle) -> StatusReport {
 
 #[tauri::command]
 fn start_server(app: AppHandle) -> Result<(), String> {
+    eprintln!("[AuraMCP IPC] start_server called");
     if mcp_running() {
         return Err("Server already running".into());
     }
@@ -160,11 +162,13 @@ fn start_server(app: AppHandle) -> Result<(), String> {
             running: true,
         },
     );
+    eprintln!("[AuraMCP IPC] start_server OK");
     Ok(())
 }
 
 #[tauri::command]
 fn stop_server(app: AppHandle) -> Result<(), String> {
+    eprintln!("[AuraMCP IPC] stop_server called");
     stop_mcp_child();
     let _ = app.emit(
         "server-status",
@@ -177,6 +181,7 @@ fn stop_server(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 fn download_nomic(app: AppHandle) -> Result<(), String> {
+    eprintln!("[AuraMCP IPC] download_nomic called");
     let app_clone = app.clone();
     std::thread::spawn(move || {
         download_nomic_blocking(&app_clone);
