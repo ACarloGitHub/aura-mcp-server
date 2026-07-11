@@ -1,5 +1,17 @@
 # Release Notes
 
+## v3.2.1 (2026-07-10)
+
+**Critical fix**: the Control Panel window opens but the embedded
+webview shows `asset not found: index.html` on v3.2.0 because
+`tauri.conf.json` had `frontendDist: "../dist"` (pointing at the
+Node MCP server's compiled output, which has no `index.html`).
+
+The Control Panel's `index.html` / `style.css` / `app.js` live at
+`src-tauri/dist/`. Changed `frontendDist` to `"./dist"`.
+
+No other changes from v3.2.0.
+
 ## v3.2.0 (2026-07-10)
 
 The headline change in v3.2 is the new **AuraMCP Control Panel** — a

@@ -1,6 +1,6 @@
 [package]
 name = "auramcp-server"
-version = "3.2.0"
+version = "3.2.1"
 description = "AuraMCP Server launcher"
 authors = ["ACarloGitHub"]
 license = "MIT"

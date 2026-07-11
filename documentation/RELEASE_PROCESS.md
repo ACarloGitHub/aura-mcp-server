@@ -256,6 +256,18 @@ PowerShell `Out-File` aggiunge BOM UTF-8 di default. GitHub rifiuta con
 "Problems parsing JSON". Usare `[System.IO.File]::WriteAllText` con
 `UTF8Encoding($false)`.
 
+### 9. `frontendDist` path
+
+`tauri.conf.json`'s `frontendDist` is resolved **relative to `src-tauri/`**.
+For aura-mcp-server the launcher frontend lives at `src-tauri/dist/`
+(`index.html` + `style.css` + `app.js`), NOT at the project root's `dist/`
+(which is the Node MCP server's compiled output and contains no
+`index.html`).
+
+The correct value is `"./dist"`, not `"../dist"`. Using `"../dist"`
+makes the webview show `asset not found: index.html` (this exact bug
+shipped in v3.2.0 and was patched in v3.2.1).
+
 ## Procedura riassunta (TL;DR)
 
 ```bash
