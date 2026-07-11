@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "AuraMCP",
-  "version": "3.2.1",
+  "version": "3.2.2",
   "identifier": "com.auramcp.server",
   "build": {
     "beforeDevCommand": "",
@@ -14,10 +14,10 @@
       {
         "label": "main",
         "title": "AuraMCP Control Panel",
-        "width": 520,
+        "width": 980,
         "height": 640,
-        "minWidth": 440,
-        "minHeight": 540,
+        "minWidth": 760,
+        "minHeight": 500,
         "visible": true,
         "decorations": true,
         "center": true,

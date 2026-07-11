@@ -555,6 +555,150 @@
       "description": "Permission identifier",
       "oneOf": [
         {
+          "description": "Enables the can_self_uninstall command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-can-self-uninstall",
+          "markdownDescription": "Enables the can_self_uninstall command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the download_nomic command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-download-nomic",
+          "markdownDescription": "Enables the download_nomic command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the get_install_paths command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-get-install-paths",
+          "markdownDescription": "Enables the get_install_paths command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the get_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-get-status",
+          "markdownDescription": "Enables the get_status command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the hide_window command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-hide-window",
+          "markdownDescription": "Enables the hide_window command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mcp_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mcp-status",
+          "markdownDescription": "Enables the mcp_status command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the open_server_folder command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-open-server-folder",
+          "markdownDescription": "Enables the open_server_folder command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the set_quit_on_close command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-set-quit-on-close",
+          "markdownDescription": "Enables the set_quit_on_close command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the show_window command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-show-window",
+          "markdownDescription": "Enables the show_window command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the start_server command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-start-server",
+          "markdownDescription": "Enables the start_server command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the stop_server command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-stop-server",
+          "markdownDescription": "Enables the stop_server command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the uninstall_app command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-uninstall-app",
+          "markdownDescription": "Enables the uninstall_app command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the can_self_uninstall command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-can-self-uninstall",
+          "markdownDescription": "Denies the can_self_uninstall command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the download_nomic command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-download-nomic",
+          "markdownDescription": "Denies the download_nomic command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the get_install_paths command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-get-install-paths",
+          "markdownDescription": "Denies the get_install_paths command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the get_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-get-status",
+          "markdownDescription": "Denies the get_status command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the hide_window command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-hide-window",
+          "markdownDescription": "Denies the hide_window command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mcp_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mcp-status",
+          "markdownDescription": "Denies the mcp_status command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the open_server_folder command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-open-server-folder",
+          "markdownDescription": "Denies the open_server_folder command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the set_quit_on_close command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-set-quit-on-close",
+          "markdownDescription": "Denies the set_quit_on_close command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the show_window command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-show-window",
+          "markdownDescription": "Denies the show_window command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the start_server command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-start-server",
+          "markdownDescription": "Denies the start_server command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the stop_server command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-stop-server",
+          "markdownDescription": "Denies the stop_server command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the uninstall_app command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-uninstall-app",
+          "markdownDescription": "Denies the uninstall_app command without any pre-configured scope."
+        },
+        {
           "description": "Default core plugins set.\n#### This default permission set includes:\n\n- `core:path:default`\n- `core:event:default`\n- `core:window:default`\n- `core:webview:default`\n- `core:app:default`\n- `core:image:default`\n- `core:resources:default`\n- `core:menu:default`\n- `core:tray:default`",
           "type": "string",
           "const": "core:default",

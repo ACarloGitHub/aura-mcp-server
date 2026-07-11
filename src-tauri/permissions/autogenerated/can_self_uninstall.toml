@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-can-self-uninstall"
+description = "Enables the can_self_uninstall command without any pre-configured scope."
+commands.allow = ["can_self_uninstall"]
+
+[[permission]]
+identifier = "deny-can-self-uninstall"
+description = "Denies the can_self_uninstall command without any pre-configured scope."
+commands.deny = ["can_self_uninstall"]

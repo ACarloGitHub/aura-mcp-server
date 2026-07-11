@@ -1,5 +1,31 @@
 # Release Notes
 
+## v3.2.2 (2026-07-10)
+
+Fixes the v3.2.0/v3.2.1 Control Panel, which was a non-functional
+read-only UI: status stayed at "Unknown" and every button was dead.
+
+**Root cause**: the capability JSON in `src-tauri/capabilities/default.json`
+listed custom IPC commands under identifiers like `get_status` /
+`app:get_status`, but Tauri's permission-identifier regex requires
+the format `<plugin>:<command>` (with a single colon and only
+lowercase ASCII + hyphens — no underscores). The validator rejected
+the JSON; at runtime Tauri then denied every command that wasn't in
+the (broken) capability.
+
+**Fix**:
+1. Capability contains only `core:*`, `dialog:*` and `opener:*`. Per
+   Tauri 2 default behaviour, app-defined `#[tauri::command]`s are
+   auto-allowed without a capability entry.
+2. `src-tauri/build.rs` now declares all 12 custom commands via
+   `AppManifest::commands`, which is the explicit form of the same
+   auto-allow — defence-in-depth.
+3. Control Panel now opens to a working 2-column layout (980 × 640 px)
+   with the LM Studio / AnythingLLM tabs on the right.
+4. Wizard is automatic on first launch: if `nomic` is missing,
+   `refreshStatus()` triggers `download_nomic()` and shows the
+   progress overlay without any user action.
+
 ## v3.2.1 (2026-07-10)
 
 **Critical fix**: the Control Panel window opens but the embedded

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-get-install-paths"
+description = "Enables the get_install_paths command without any pre-configured scope."
+commands.allow = ["get_install_paths"]
+
+[[permission]]
+identifier = "deny-get-install-paths"
+description = "Denies the get_install_paths command without any pre-configured scope."
+commands.deny = ["get_install_paths"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-download-nomic"
+description = "Enables the download_nomic command without any pre-configured scope."
+commands.allow = ["download_nomic"]
+
+[[permission]]
+identifier = "deny-download-nomic"
+description = "Denies the download_nomic command without any pre-configured scope."
+commands.deny = ["download_nomic"]

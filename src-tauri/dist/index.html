@@ -8,8 +8,13 @@
   </head>
   <body>
     <header>
-      <h1>AuraMCP</h1>
-      <span id="version" class="version">v—</span>
+      <div class="brand">
+        <h1>AuraMCP</h1>
+        <span id="version" class="version">v—</span>
+      </div>
+      <div class="header-right">
+        <span id="install-dir" class="muted small"></span>
+      </div>
     </header>
 
     <section id="download-overlay" class="overlay hidden" aria-hidden="true">
@@ -25,132 +30,159 @@
         </div>
         <p id="progress-label" class="muted small">Starting…</p>
         <p id="progress-error" class="error small hidden"></p>
+        <div class="row buttons" style="margin-top: 8px;">
+          <button id="btn-dismiss-overlay" class="secondary">
+            Hide (download continues in background)
+          </button>
+        </div>
       </div>
     </section>
 
-    <main id="main-panel">
-      <section class="card">
-        <h2>Server status</h2>
-        <div class="row">
-          <span class="status-dot" id="mcp-dot"></span>
-          <span id="mcp-label" class="status-label">Unknown</span>
-        </div>
-        <div class="row buttons">
-          <button id="btn-start" class="primary">Start</button>
-          <button id="btn-stop">Stop</button>
-        </div>
-      </section>
-
-      <section class="card">
-        <h2>RAG components</h2>
-        <ul class="component-list">
-          <li>
-            <span class="status-dot" id="nomic-dot"></span>
-            <span class="comp-label">nomic GGUF model</span>
-            <span id="nomic-path" class="muted small path"></span>
-            <button id="btn-download" class="link-btn hidden">Download now</button>
-          </li>
-          <li>
-            <span class="status-dot" id="llama-dot"></span>
-            <span class="comp-label">llama-server embedding backend</span>
-            <span id="llama-url" class="muted small path"></span>
-          </li>
-        </ul>
-        <p class="hint">
-          The llama-server is started automatically by the Node MCP server on the
-          first <code>rag</code> tool call. The status above reflects whether the
-          backend has been started and is reachable.
-        </p>
-      </section>
-
-      <section class="card">
-        <h2>Quick start: wire into your MCP host</h2>
-        <div class="tabs">
-          <button class="tab active" data-tab="lmstudio">LM Studio</button>
-          <button class="tab" data-tab="anythingllm">AnythingLLM</button>
-        </div>
-        <div class="tab-panels">
-          <div class="tab-panel active" data-tab="lmstudio">
-            <p>
-              Open <strong>Program tab → Install → Edit mcp.json</strong> in LM
-              Studio, or edit the file directly:
-            </p>
-            <p class="hint">
-              <code id="lmstudio-path">~/.lmstudio/mcp.json</code>
-            </p>
-            <pre id="lmstudio-json" class="json"></pre>
-            <div class="row buttons">
-              <button class="link-btn" data-copy="lmstudio-json">Copy to clipboard</button>
-              <span id="lmstudio-copied" class="muted small hidden">Copied</span>
-            </div>
-            <p class="hint">
-              <strong>Gotcha:</strong> when pasting manually, copy only the
-              content between <code>"mcpServers": {</code> and the matching
-              closing brace. LM Studio merges into the existing top-level key.
-            </p>
+    <main id="main-panel" class="grid">
+      <!-- Colonna sinistra: stato e RAG -->
+      <div class="col">
+        <section class="card">
+          <h2>Server status</h2>
+          <div class="row">
+            <span class="status-dot" id="mcp-dot"></span>
+            <span id="mcp-label" class="status-label">Unknown</span>
           </div>
-          <div class="tab-panel" data-tab="anythingllm">
-            <p>
-              Edit the file at
-              <code id="anythingllm-path">&lt;storage&gt;/plugins/anythingllm_mcp_servers.json</code>
-              (AnythingLLM creates it if missing):
-            </p>
-            <pre id="anythingllm-json" class="json"></pre>
-            <div class="row buttons">
-              <button class="link-btn" data-copy="anythingllm-json">Copy to clipboard</button>
-              <span id="anythingllm-copied" class="muted small hidden">Copied</span>
-            </div>
-            <p>
-              Then open AnythingLLM → Settings → MCP Servers. The server
-              appears with status, error logs, and reload/restart controls.
-            </p>
-            <details>
-              <summary>Disable auto-start (optional)</summary>
+          <div class="row buttons">
+            <button id="btn-start" class="primary">Start</button>
+            <button id="btn-stop">Stop</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>RAG components</h2>
+          <ul class="component-list">
+            <li>
+              <span class="status-dot" id="nomic-dot"></span>
+              <span class="comp-label">nomic GGUF model</span>
+              <span id="nomic-path" class="muted small path"></span>
+              <button id="btn-download" class="link-btn hidden">
+                Download now
+              </button>
+            </li>
+            <li>
+              <span class="status-dot" id="llama-dot"></span>
+              <span class="comp-label">llama-server embedding backend</span>
+              <span id="llama-url" class="muted small path"></span>
+            </li>
+          </ul>
+          <p class="hint">
+            The llama-server is started automatically by the Node MCP server on
+            the first <code>rag</code> tool call. The status above reflects
+            whether the backend is reachable.
+          </p>
+        </section>
+
+        <section class="card">
+          <h2>Options</h2>
+          <div class="row">
+            <label class="checkbox">
+              <input type="checkbox" id="chk-quit-on-close" />
+              <span
+                >Quit AuraMCP when closing this window (otherwise the window
+                closes to the tray)</span
+              >
+            </label>
+          </div>
+          <div class="row buttons">
+            <button id="btn-browse" class="secondary">Browse server folder</button>
+          </div>
+        </section>
+      </div>
+
+      <!-- Colonna destra: quick start + uninstall -->
+      <div class="col">
+        <section class="card">
+          <h2>Wire into your MCP host</h2>
+          <div class="tabs">
+            <button class="tab active" data-tab="lmstudio">LM Studio</button>
+            <button class="tab" data-tab="anythingllm">AnythingLLM</button>
+          </div>
+          <div class="tab-panels">
+            <div class="tab-panel active" data-tab="lmstudio">
               <p class="hint">
-                Add <code>"anythingllm": { "autoStart": false }</code> under
-                the server entry to prevent AnythingLLM from starting it on
-                app launch (useful on resource-constrained machines).
+                Open
+                <strong>Program → Install → Edit mcp.json</strong>
+                in LM Studio, or edit:
               </p>
-              <pre id="anythingllm-noautostart-json" class="json"></pre>
+              <p class="hint">
+                <code id="lmstudio-path">~/.lmstudio/mcp.json</code>
+              </p>
+              <pre id="lmstudio-json" class="json"></pre>
               <div class="row buttons">
-                <button class="link-btn" data-copy="anythingllm-noautostart-json">Copy to clipboard</button>
-                <span id="anythingllm-noautostart-copied" class="muted small hidden">Copied</span>
+                <button class="link-btn" data-copy="lmstudio-json">
+                  Copy to clipboard
+                </button>
+                <span id="lmstudio-copied" class="muted small hidden"
+                  >Copied</span
+                >
               </div>
-            </details>
+              <p class="hint">
+                <strong>Gotcha:</strong> when pasting manually, copy only the
+                content between <code>"mcpServers": {</code> and the matching
+                closing brace. LM Studio merges into the existing top-level key.
+              </p>
+            </div>
+            <div class="tab-panel" data-tab="anythingllm">
+              <p class="hint">
+                Edit the file at
+                <code id="anythingllm-path"
+                  >&lt;storage&gt;/plugins/anythingllm_mcp_servers.json</code
+                >
+                (AnythingLLM creates it if missing):
+              </p>
+              <pre id="anythingllm-json" class="json"></pre>
+              <div class="row buttons">
+                <button class="link-btn" data-copy="anythingllm-json">
+                  Copy to clipboard
+                </button>
+                <span id="anythingllm-copied" class="muted small hidden"
+                  >Copied</span
+                >
+              </div>
+              <p class="hint">
+                Open AnythingLLM → Settings → MCP Servers for status, error
+                logs, and reload/restart controls.
+              </p>
+              <details>
+                <summary>Disable auto-start (optional)</summary>
+                <p class="hint">
+                  Add <code>"anythingllm": { "autoStart": false }</code>
+                  under the server entry to prevent AnythingLLM from starting
+                  it on app launch (useful on resource-constrained machines).
+                </p>
+                <pre id="anythingllm-noautostart-json" class="json"></pre>
+                <div class="row buttons">
+                  <button class="link-btn" data-copy="anythingllm-noautostart-json">
+                    Copy to clipboard
+                  </button>
+                  <span id="anythingllm-noautostart-copied" class="muted small hidden"
+                    >Copied</span
+                  >
+                </div>
+              </details>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section class="card">
-        <h2>Options</h2>
-        <div class="row">
-          <label class="checkbox">
-            <input type="checkbox" id="chk-quit-on-close" />
-            Quit AuraMCP when closing this window (otherwise the window
-            closes to the tray)
-          </label>
-        </div>
-        <div class="row buttons">
-          <button id="btn-browse" class="secondary">Browse server folder</button>
-        </div>
-      </section>
-
-      <section class="card danger-card">
-        <h2>Uninstall</h2>
-        <p class="hint">
-          Removes AuraMCP from this machine. On Windows the bundled
-          uninstaller runs (it asks whether to also delete your workspace
-          and downloaded embedding model). On macOS / Linux the system
-          uninstall flow is used — see <code>setup.md</code> for details.
-        </p>
-        <div class="row buttons">
-          <button id="btn-uninstall" class="danger">Uninstall AuraMCP…</button>
-        </div>
-      </section>
-
-      <footer class="footer">
-        <span id="install-dir" class="muted small"></span>
-      </footer>
+        <section class="card danger-card">
+          <h2>Uninstall</h2>
+          <p class="hint">
+            Removes AuraMCP from this machine. On Windows the bundled
+            uninstaller runs; on macOS / Linux it opens an alert with the
+            manual steps. Per-user data in
+            <code>%APPDATA%\com.auramcp.server</code> is kept by default and
+            must be deleted manually.
+          </p>
+          <div class="row buttons">
+            <button id="btn-uninstall" class="danger">Uninstall AuraMCP…</button>
+          </div>
+        </section>
+      </div>
     </main>
 
     <script type="module" src="app.js"></script>
