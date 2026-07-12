@@ -127,6 +127,10 @@
     mcpLabel: $("mcp-label"),
     btnStart: $("btn-start"),
     btnStop: $("btn-stop"),
+    mcpBinDot: $("mcp-bin-dot"),
+    mcpBinPath: $("mcp-bin-path"),
+    nodeDot: $("node-dot"),
+    nodePath: $("node-path"),
     nomicDot: $("nomic-dot"),
     nomicPath: $("nomic-path"),
     btnDownload: $("btn-download"),
@@ -168,6 +172,16 @@
       els.mcpLabel.textContent = s.mcpRunning ? "Running" : "Stopped";
       els.btnStart.disabled = !!s.mcpRunning;
       els.btnStop.disabled = !s.mcpRunning;
+
+      setDot(els.mcpBinDot, s.distIndexExists ? "ok" : "down");
+      els.mcpBinPath.textContent = s.distIndexExists
+        ? s.distIndexPath
+        : "Missing! The MCP server code (dist/index.js) was not bundled. Install AuraMCP alongside the Node project, or reinstall.";
+
+      setDot(els.nodeDot, s.nodePath ? "ok" : "down");
+      els.nodePath.textContent = s.nodePath
+        ? s.nodePath
+        : "Node.js (>=18) not found in PATH. Install Node.js or add it to PATH.";
 
       setDot(els.nomicDot, s.rag.nomicPresent ? "ok" : "down");
       els.nomicPath.textContent = s.rag.nomicPresent
@@ -380,7 +394,7 @@
   // --- init ---
   await refreshHostJson();
   await refreshStatus();
-  setInterval(refreshStatus, 5000);
+  setInterval(refreshStatus, 10000);
 
   console.log("[AuraMCP] Control Panel initialized successfully");
 })();

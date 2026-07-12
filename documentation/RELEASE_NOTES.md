@@ -1,5 +1,32 @@
 # Release Notes
 
+## v3.2.5 (2026-07-12)
+
+**Fix: Control Panel froze after a few seconds, console windows
+flashed, and IPC calls timed out.**
+
+Root causes fixed:
+
+- **Console window flashing on Windows**: every `Command::new()` call
+  spawned a visible console window. Fixed by adding
+  `CREATE_NO_WINDOW` (0x08000000) to all process spawns.
+- **IPC timeout after ~5 seconds**: `get_status` was called every 5s
+  by `setInterval`. Each call ran `find_node()` which scans PATH and
+  spawns `node --version` — slow on Windows. Fixed by caching the
+  result with `OnceLock` so `find_node()` runs only once.
+- **`start_server` timeout**: same cause — `start_mcp_child()` called
+  `find_node()` again. Now uses the cached path.
+- **`llama_reachable()` slowness**: created a new `reqwest::Client`
+  (with TLS init) on every poll. Now uses a cached client.
+- **App freeze at startup**: `start_mcp_child()` in `.setup()` blocked
+  the Tauri runtime. Now runs in a background thread.
+- **Dead child detection**: `mcp_running()` now uses `try_wait()` to
+  detect if the node child has exited, instead of reporting "running"
+  forever after a crash.
+- **Polling interval**: increased from 5s to 10s to reduce overhead.
+- **New status rows**: the Control Panel now also shows whether
+  `dist/index.js` exists and whether Node.js is in PATH.
+
 ## v3.2.4 (2026-07-12)
 
 **Critical fix: Control Panel was completely non-functional in all

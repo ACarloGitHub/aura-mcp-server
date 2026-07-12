@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
 use serde::Serialize;
@@ -8,10 +8,13 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager};
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 const NOMIC_GGUF_NAME: &str = "nomic-embed-text-v2-moe.Q8_0.gguf";
 const NOMIC_GGUF_URL: &str =
     "https://huggingface.co/nomic-ai/nomic-embed-text-v2-moe-GGUF/resolve/main/nomic-embed-text-v2-moe.Q8_0.gguf";
-const LLAMACPP_HEALTH_TIMEOUT_MS: u64 = 500;
+const LLAMACPP_HEALTH_TIMEOUT_MS: u64 = 800;
 
 static MCP_CHILD: Mutex<Option<Child>> = Mutex::new(None);
 static QUIT_ON_CLOSE: Mutex<bool> = Mutex::new(false);
@@ -57,7 +60,43 @@ struct StatusReport {
     workspace_dir: Option<String>,
     node_path: Option<String>,
     dist_index_path: String,
+    dist_index_exists: bool,
     quit_on_close: bool,
+}
+
+#[cfg(target_os = "windows")]
+fn no_window(cmd: &mut Command) {
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    cmd.creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(not(target_os = "windows"))]
+fn no_window(_cmd: &mut Command) {}
+
+static NODE_PATH: OnceLock<Option<String>> = OnceLock::new();
+
+fn cached_node_path() -> Option<String> {
+    NODE_PATH.get_or_init(find_node).clone()
+}
+
+static HTTP_CLIENT: OnceLock<Option<reqwest::blocking::Client>> = OnceLock::new();
+
+fn llama_reachable() -> bool {
+    let client = HTTP_CLIENT.get_or_init(|| {
+        reqwest::blocking::Client::builder()
+            .timeout(Duration::from_millis(LLAMACPP_HEALTH_TIMEOUT_MS))
+            .build()
+            .ok()
+    });
+    let client = match client {
+        Some(c) => c,
+        None => return false,
+    };
+    let url = llama_health_url();
+    match client.get(&url).send() {
+        Ok(r) => r.status().is_success(),
+        Err(_) => false,
+    }
 }
 
 // ---------- paths ----------
@@ -106,35 +145,34 @@ fn llama_health_url() -> String {
     format!("http://{}:{}/health", host, port)
 }
 
-fn llama_reachable() -> bool {
-    let url = llama_health_url();
-    let client = match reqwest::blocking::Client::builder()
-        .timeout(Duration::from_millis(LLAMACPP_HEALTH_TIMEOUT_MS))
-        .build()
-    {
-        Ok(c) => c,
-        Err(_) => return false,
-    };
-    match client.get(&url).send() {
-        Ok(r) => r.status().is_success(),
-        Err(_) => false,
-    }
-}
-
 fn nomic_present(app: &AppHandle) -> bool {
     nomic_target(app).is_file()
 }
 
 fn mcp_running() -> bool {
-    MCP_CHILD.lock().unwrap().is_some()
+    let mut guard = MCP_CHILD.lock().unwrap();
+    match &mut *guard {
+        Some(child) => match child.try_wait() {
+            Ok(Some(_)) => {
+                *guard = None;
+                false
+            }
+            Ok(None) => true,
+            Err(_) => {
+                *guard = None;
+                false
+            }
+        },
+        None => false,
+    }
 }
 
 // ---------- IPC commands ----------
 
 #[tauri::command]
 fn get_status(app: AppHandle) -> StatusReport {
-    eprintln!("[AuraMCP IPC] get_status called");
     let install_dir = launcher_install_dir(&app);
+    let dist_path = dist_index_path(&app);
     let llama_bin = find_llama_server(&app);
     StatusReport {
         mcp_running: mcp_running(),
@@ -150,8 +188,9 @@ fn get_status(app: AppHandle) -> StatusReport {
         },
         install_dir: install_dir.to_string_lossy().to_string(),
         workspace_dir: workspace_dir_from_env().map(|p| p.to_string_lossy().to_string()),
-        node_path: find_node(),
-        dist_index_path: dist_index_path(&app).to_string_lossy().to_string(),
+        node_path: cached_node_path(),
+        dist_index_path: dist_path.to_string_lossy().to_string(),
+        dist_index_exists: dist_path.is_file(),
         quit_on_close: *QUIT_ON_CLOSE.lock().unwrap(),
     }
 }
@@ -237,16 +276,11 @@ fn hide_window(app: AppHandle) {
     }
 }
 
-/// Reports whether the launcher can spawn a platform-native uninstaller on its own.
-/// Currently: only Windows. macOS / Linux return `false` and the frontend falls back
-/// to a documentation hint.
 #[tauri::command]
 fn can_self_uninstall() -> bool {
     cfg!(target_os = "windows")
 }
 
-/// Spawns the platform-native uninstaller (Windows only) and exits the launcher.
-/// Returns an error string on macOS / Linux so the frontend can fall back to docs.
 #[tauri::command]
 fn uninstall_app(app: AppHandle) -> Result<(), String> {
     stop_mcp_child();
@@ -256,15 +290,14 @@ fn uninstall_app(app: AppHandle) -> Result<(), String> {
         let uninstaller = install.join("uninstall.exe");
         if !uninstaller.is_file() {
             return Err(format!(
-                "Uninstaller not found at {}. Use Windows Settings → Apps to uninstall AuraMCP.",
+                "Uninstaller not found at {}. Use Windows Settings to uninstall AuraMCP.",
                 uninstaller.display()
             ));
         }
-        Command::new(&uninstaller)
-            .spawn()
+        let mut cmd = Command::new(&uninstaller);
+        no_window(&mut cmd);
+        cmd.spawn()
             .map_err(|e| format!("failed to launch uninstaller: {e}"))?;
-        // Give the uninstaller a moment to acquire focus, then exit so it can
-        // replace the launcher's files.
         std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(400));
             app.exit(0);
@@ -273,7 +306,7 @@ fn uninstall_app(app: AppHandle) -> Result<(), String> {
     }
     #[cfg(not(target_os = "windows"))]
     {
-        Err("Self-uninstall is not implemented for this platform. Please use the standard OS uninstall flow (see setup.md).".to_string())
+        Err("Self-uninstall is not implemented for this platform.".to_string())
     }
 }
 
@@ -285,9 +318,8 @@ fn find_node() -> Option<String> {
     for dir in std::env::split_paths(&path) {
         let candidate = dir.join(cmd_name);
         if candidate.is_file() {
-            let path_str = candidate.to_string_lossy().into_owned();
-            if node_version_ok(&path_str) {
-                return Some(path_str);
+            if node_version_ok(&candidate.to_string_lossy()) {
+                return Some(candidate.to_string_lossy().into_owned());
             }
         }
     }
@@ -295,14 +327,18 @@ fn find_node() -> Option<String> {
 }
 
 fn node_version_ok(node: &str) -> bool {
-    let out = Command::new(node).arg("--version").output();
-    if let Ok(out) = out {
-        if let Ok(s) = String::from_utf8(out.stdout) {
-            let s = s.trim();
-            if let Some(rest) = s.strip_prefix("v") {
-                if let Some((major, _)) = rest.split_once('.') {
-                    return major.parse::<u32>().map(|n| n >= 18).unwrap_or(false);
-                }
+    let mut cmd = Command::new(node);
+    cmd.arg("--version");
+    no_window(&mut cmd);
+    let out = match cmd.output() {
+        Ok(o) => o,
+        Err(_) => return false,
+    };
+    if let Ok(s) = String::from_utf8(out.stdout) {
+        let s = s.trim();
+        if let Some(rest) = s.strip_prefix("v") {
+            if let Some((major, _)) = rest.split_once('.') {
+                return major.parse::<u32>().map(|n| n >= 18).unwrap_or(false);
             }
         }
     }
@@ -352,7 +388,8 @@ fn find_llama_server(app: &AppHandle) -> Option<PathBuf> {
 }
 
 fn start_mcp_child(app: &AppHandle) -> Result<(), String> {
-    let node = find_node().ok_or_else(|| "node (>=18) not found in PATH".to_string())?;
+    let node = cached_node_path()
+        .ok_or_else(|| "node (>=18) not found in PATH".to_string())?;
     let index_js = find_index_js(app)
         .ok_or_else(|| "dist/index.js not found beside the launcher".to_string())?;
 
@@ -361,6 +398,7 @@ fn start_mcp_child(app: &AppHandle) -> Result<(), String> {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .stdin(Stdio::null());
+    no_window(&mut cmd);
 
     if let Some(parent) = index_js.parent() {
         let _ = cmd.current_dir(parent.parent().unwrap_or(parent));
@@ -380,6 +418,7 @@ fn start_mcp_child(app: &AppHandle) -> Result<(), String> {
         .map_err(|e| format!("failed to spawn node: {e}"))?;
 
     *MCP_CHILD.lock().unwrap() = Some(child);
+    eprintln!("[AuraMCP] MCP child started: {} {}", node, index_js.display());
     Ok(())
 }
 
@@ -494,7 +533,6 @@ fn download_nomic_blocking(app: &AppHandle) {
             return;
         }
         downloaded += n as u64;
-        // Emit at most every ~1 MB to avoid flooding the event bus.
         if downloaded - last_emit >= 1024 * 1024 || n == 0 {
             last_emit = downloaded;
             let percent = if total > 0 {
@@ -526,9 +564,10 @@ fn open_in_file_manager(path: &Path) -> Result<(), String> {
     let path_str = path.to_string_lossy().to_string();
     #[cfg(target_os = "windows")]
     {
-        Command::new("explorer")
-            .arg(&path_str)
-            .spawn()
+        let mut cmd = Command::new("explorer");
+        cmd.arg(&path_str);
+        no_window(&mut cmd);
+        cmd.spawn()
             .map_err(|e| format!("explorer failed: {e}"))?;
     }
     #[cfg(target_os = "macos")]
@@ -615,9 +654,12 @@ pub fn run() {
         ])
         .setup(|app| {
             build_tray(app.handle())?;
-            if let Err(e) = start_mcp_child(app.handle()) {
-                eprintln!("[AuraMCP launcher] failed to start node: {e}");
-            }
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                if let Err(e) = start_mcp_child(&handle) {
+                    eprintln!("[AuraMCP launcher] failed to start node: {e}");
+                }
+            });
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -643,5 +685,5 @@ pub fn run() {
 
 #[tauri::command]
 fn mcp_status() -> bool {
-    MCP_CHILD.lock().unwrap().is_some()
+    mcp_running()
 }
