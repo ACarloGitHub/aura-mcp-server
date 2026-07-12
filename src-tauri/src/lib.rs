@@ -42,6 +42,8 @@ struct ServerStatus {
 struct RagStatus {
     nomic_present: bool,
     nomic_path: String,
+    llama_bin_present: bool,
+    llama_bin_path: String,
     llama_reachable: bool,
     llama_url: String,
 }
@@ -133,11 +135,16 @@ fn mcp_running() -> bool {
 fn get_status(app: AppHandle) -> StatusReport {
     eprintln!("[AuraMCP IPC] get_status called");
     let install_dir = launcher_install_dir(&app);
+    let llama_bin = find_llama_server(&app);
     StatusReport {
         mcp_running: mcp_running(),
         rag: RagStatus {
             nomic_present: nomic_present(&app),
             nomic_path: nomic_target(&app).to_string_lossy().to_string(),
+            llama_bin_present: llama_bin.is_some(),
+            llama_bin_path: llama_bin
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_default(),
             llama_reachable: llama_reachable(),
             llama_url: llama_health_url(),
         },

@@ -1,5 +1,23 @@
 # Release Notes
 
+## v3.2.4 (2026-07-12)
+
+**Critical fix: Control Panel was completely non-functional in all
+previous releases (v3.2.0–v3.2.3).**
+
+Root cause: `withGlobalTauri: true` was missing from `tauri.conf.json`.
+Without this flag, Tauri 2 does not inject `window.__TAURI__` into the
+webview, so every IPC call (`invoke`) failed silently and the frontend
+was "cosmetic only" — no status, no buttons, no downloads.
+
+Additional fixes:
+- **llama-server binary status**: the Control Panel now shows whether
+  the bundled `llama-server` binary is present in `vendor/llama.cpp/`,
+  separate from whether the embedding HTTP endpoint is reachable.
+- **Defensive frontend**: `app.js` now null-checks `window.__TAURI__`
+  before any use, with a visible error message if the global is missing.
+- **Removed duplicate `debug()` function** that shadowed the global one.
+
 ## v3.2.3 (2026-07-11)
 
 The v3.2.2 release still had a broken Control Panel. The actual
