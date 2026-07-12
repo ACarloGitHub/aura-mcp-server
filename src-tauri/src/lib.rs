@@ -172,7 +172,7 @@ fn mcp_running() -> bool {
 #[tauri::command]
 fn get_status(app: AppHandle) -> StatusReport {
     let install_dir = launcher_install_dir(&app);
-    let dist_path = dist_index_path(&app);
+    let index_js = find_index_js(&app);
     let llama_bin = find_llama_server(&app);
     StatusReport {
         mcp_running: mcp_running(),
@@ -189,8 +189,11 @@ fn get_status(app: AppHandle) -> StatusReport {
         install_dir: install_dir.to_string_lossy().to_string(),
         workspace_dir: workspace_dir_from_env().map(|p| p.to_string_lossy().to_string()),
         node_path: cached_node_path(),
-        dist_index_path: dist_path.to_string_lossy().to_string(),
-        dist_index_exists: dist_path.is_file(),
+        dist_index_path: index_js
+            .as_ref()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| dist_index_path(&app).to_string_lossy().to_string()),
+        dist_index_exists: index_js.is_some(),
         quit_on_close: *QUIT_ON_CLOSE.lock().unwrap(),
     }
 }
@@ -349,6 +352,12 @@ fn find_index_js(app: &AppHandle) -> Option<PathBuf> {
     let p = dist_index_path(app);
     if p.is_file() {
         return Some(p);
+    }
+    if let Ok(res) = app.path().resource_dir() {
+        let p = res.join("dist").join("index.js");
+        if p.is_file() {
+            return Some(p);
+        }
     }
     None
 }

@@ -1,11 +1,11 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "AuraMCP",
-  "version": "3.2.5",
+  "version": "3.3.0",
   "identifier": "com.auramcp.server",
   "build": {
-    "beforeDevCommand": "",
-    "beforeBuildCommand": "npm run build",
+    "beforeDevCommand": "npm run build",
+    "beforeBuildCommand": "",
     "frontendDist": "./dist",
     "devUrl": "http://localhost:1420"
   },
@@ -49,7 +49,9 @@
     "resources": [
       "../vendor/llama.cpp/windows/*",
       "../vendor/llama.cpp/macos/*",
-      "../vendor/llama.cpp/linux/*"
+      "../vendor/llama.cpp/linux/*",
+      "../dist/**/*",
+      "../node_modules/**/*"
     ],
     "externalBin": [],
     "createUpdaterArtifacts": false

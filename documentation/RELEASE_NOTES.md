@@ -1,5 +1,27 @@
 # Release Notes
 
+## v3.3.0 (2026-07-12)
+
+**The Node MCP server is now bundled inside the installer.**
+
+Previous versions shipped without `dist/index.js` and `node_modules/`,
+so clicking "Start" always failed with "dist/index.js not found beside
+the launcher".
+
+Changes:
+- `tauri.conf.json` resources now include `../dist/**/*` and
+  `../node_modules/**/*` so the compiled MCP server and its
+  production dependencies are embedded in the MSI/NSIS/DMG/DEB/RPM.
+- CI workflow: `npm ci` (was `--ignore-scripts`) so native modules
+  (better-sqlite3, sqlite-vec) get their prebuilt binaries. After
+  TypeScript compilation, `npm prune --omit=dev` strips ~80 MB of
+  dev tooling before bundling.
+- `beforeBuildCommand` moved to CI steps (`npm run build` + prune)
+  to control the order: compile, prune, then bundle.
+- `find_index_js()` now also checks `resource_dir()` (macOS places
+  resources under `Contents/Resources/`).
+- `get_status` reports the actual resolved path.
+
 ## v3.2.5 (2026-07-12)
 
 **Fix: Control Panel froze after a few seconds, console windows
