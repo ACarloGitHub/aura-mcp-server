@@ -49,9 +49,16 @@ Write-Output "package=$pkg  cargo=$cargo  tauri.conf=$conf"
 Select-String -Path .github/workflows/release.yml -Pattern 'tauri-action'
 # atteso: tauri-apps/tauri-action@v0
 
-# 6. npm ci con --ignore-scripts (i moduli nativi non servono in CI)
+# 6. Node LTS 22+ in CI e npm ci SENZA --ignore-scripts.
+#    better-sqlite3 12.x NON ha prebuilt per Node 20 (EOL): con Node 20
+#    prebuild-install cade su node-gyp che NON riconosce VS2026 (v. Lesson #10).
+#    Con Node 22 il prebuilt esiste e npm ci non compila nulla.
+Select-String -Path .github/workflows/release.yml -Pattern 'node-version'
+# atteso: "22" (o LTS corrente)
 Select-String -Path .github/workflows/release.yml -Pattern 'npm ci'
-# atteso: npm ci --ignore-scripts
+# atteso: npm ci   (NO --ignore-scripts: i node_modules vanno bundlati)
+(Get-Content package.json | ConvertFrom-Json).engines.node
+# atteso: ">=22.0.0"
 
 # 7. cargo clean -p <crate-name> presente (forza re-embed frontend)
 #    crate name è in src-tauri/Cargo.toml [package] name = "..."
@@ -267,6 +274,69 @@ For aura-mcp-server the launcher frontend lives at `src-tauri/dist/`
 The correct value is `"./dist"`, not `"../dist"`. Using `"../dist"`
 makes the webview show `asset not found: index.html` (this exact bug
 shipped in v3.2.0 and was patched in v3.2.1).
+
+### 10. `better-sqlite3` non ha prebuilt per Node 20 → node-gyp non vede VS2026
+
+Sintomo (CI Windows):
+
+```
+npm error prebuild-install warn install No prebuilt binaries found (target=20.x...)
+npm error gyp ERR! find VS unknown version "undefined" found at ".../Visual Studio/18/Enterprise"
+npm error gyp ERR! find VS could not find a version of Visual Studio 2017 or newer to use
+```
+
+Causa: Node 20 è **EOL** (aprile 2026). `better-sqlite3@12.x` pubblica
+prebuilt solo per Node 22+ (ABI 127), 24 (137), 25 (141), 26 (147) — **non**
+per Node 20 (ABI 115). Senza prebuilt, `prebuild-install` cade su
+`node-gyp rebuild`; il node-gyp in dotto a npm 10 (10.1.0) **non riconosce
+Visual Studio 2026** (v18) → build fallita.
+
+Tentativi sbagliati (non fateli):
+
+- `ilammy/msvc-dev-tools@v1`: il **repo non esiste più** (HTTP 404,
+  "Unable to resolve action `ilammy/msvc-dev-tools`, repository not found").
+- `npm_config_node_gyp` / `npm config set node_gyp`: **ignorati** da npm 10
+  per gli script di lifecycle (continua a usare il node-gyp bundled 10.1.0).
+
+**Fix**: `actions/setup-node` con `node-version: "22"` (LTS corrente).
+better-sqlite3 ha il prebuilt per ABI 127, `npm ci` scarica il binario e
+non compila nulla → niente problema MSVC. Aggiornare anche
+`package.json` → `engines.node` a `>=22.0.0`.
+
+### 11. Tauri v2 mappa i resource path con `../` sotto `_up_/`
+
+Sintomo (runtime, dopo l'installazione):
+
+```
+Could not start server: dist/index.js not found beside the launcher
+```
+
+e il pannello mostra "MCP server code (dist/index.js) **Missing!**" anche
+se l'installer è chiaramente più grande (i file CI sono nel bundle).
+
+Causa: in Tauri v2 le `bundle.resources` con path `../` (fuori da
+`src-tauri/`) vengono collocate in una cartella **`_up_/`** (un `_up_`
+per ogni `..`). Quindi `../dist/**/*` finisce in `<resource_dir>/_up_/dist/`
+— su Windows MSI/NSIS `<install_dir>/_up_/dist/index.js`, su macOS
+`Contents/Resources/_up_/dist/index.js` — **non** in `<resource_dir>/dist/`.
+
+Verificato estraendo l'MSI con `msiexec /a AuraMCP_x64_en-US.msi /qn TARGETDIR=...`:
+
+```
+AuraMCP/_up_/dist/index.js
+AuraMCP/_up_/node_modules/...
+```
+
+**Fix**: il lookup runtime (`find_index_js` in `src-tauri/src/lib.rs`) deve
+cercare anche `<install>/_up_/dist/index.js` e
+`<resource_dir>/_up_/dist/index.js`. È la **stessa** convenzione `_up_`
+già usata per `../vendor/llama.cpp` in `find_llama_server` (motivo per cui
+llama-server veniva trovato ma dist/index.js no: il bundle di dist è nuovo
+in v3.3.0, quello di llama.cpp esiste da prima).
+
+> **Caveat ABI**: il binario nativo di `better-sqlite3` è pinzato all'ABI
+> del node di build (Node 22 = ABI 127). L'app richiede **Node 22+**
+> installato sulla macchina utente (il launcher esegue il `node` nel PATH).
 
 ## Procedura riassunta (TL;DR)
 
