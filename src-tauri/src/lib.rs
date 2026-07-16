@@ -349,12 +349,21 @@ fn node_version_ok(node: &str) -> bool {
 }
 
 fn find_index_js(app: &AppHandle) -> Option<PathBuf> {
-    let p = dist_index_path(app);
-    if p.is_file() {
-        return Some(p);
-    }
+    let install = launcher_install_dir(app);
+    let mut candidates: Vec<PathBuf> = vec![
+        // Beside the launcher exe (dev layout)
+        install.join("dist").join("index.js"),
+        // Tauri v2 maps resource paths containing "../" into a "_up_/" folder.
+        // On Windows (MSI/NSIS) resources sit next to the exe, so the bundled
+        // "../dist/**/*" lands at <exe_dir>/_up_/dist/index.js
+        install.join("_up_").join("dist").join("index.js"),
+    ];
     if let Ok(res) = app.path().resource_dir() {
-        let p = res.join("dist").join("index.js");
+        // macOS: Contents/Resources/_up_/dist/index.js (and a non-_up_ fallback)
+        candidates.push(res.join("_up_").join("dist").join("index.js"));
+        candidates.push(res.join("dist").join("index.js"));
+    }
+    for p in candidates {
         if p.is_file() {
             return Some(p);
         }
