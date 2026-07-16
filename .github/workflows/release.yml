@@ -45,10 +45,52 @@ jobs:
             wget
 
       - name: Setup Node.js
+        id: setup-node
         uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: "npm"
+
+      - name: Download bundled Node runtime
+        shell: bash
+        env:
+          NODE_VERSION: ${{ steps.setup-node.outputs.node-version }}
+        run: |
+          set -e
+          mkdir -p vendor/node
+          ver="${NODE_VERSION#v}"
+          echo "Bundling Node v${ver} for $RUNNER_OS into vendor/node/"
+          case "$RUNNER_OS" in
+            Windows)
+              url="https://nodejs.org/dist/v${ver}/node-v${ver}-win-x64.zip"
+              curl -fsSL "$url" -o /tmp/node.zip
+              mkdir -p /tmp/nodebin
+              tar -xf /tmp/node.zip -C /tmp/nodebin
+              cp "/tmp/nodebin/node-v${ver}-win-x64/node.exe" vendor/node/node.exe
+              cp "/tmp/nodebin/node-v${ver}-win-x64/LICENSE" vendor/node/LICENSE
+              ;;
+            Linux)
+              url="https://nodejs.org/dist/v${ver}/node-v${ver}-linux-x64.tar.gz"
+              curl -fsSL "$url" -o /tmp/node.tgz
+              mkdir -p /tmp/nodebin
+              tar -xzf /tmp/node.tgz -C /tmp/nodebin
+              cp "/tmp/nodebin/node-v${ver}-linux-x64/bin/node" vendor/node/node
+              cp "/tmp/nodebin/node-v${ver}-linux-x64/LICENSE" vendor/node/LICENSE
+              chmod +x vendor/node/node
+              ;;
+            macOS)
+              for arch in arm64 x64; do
+                url="https://nodejs.org/dist/v${ver}/node-v${ver}-darwin-${arch}.tar.gz"
+                curl -fsSL "$url" -o "/tmp/node-${arch}.tgz"
+                mkdir -p "/tmp/nodebin-${arch}"
+                tar -xzf "/tmp/node-${arch}.tgz" -C "/tmp/nodebin-${arch}"
+                cp "/tmp/nodebin-${arch}/node-v${ver}-darwin-${arch}/bin/node" "vendor/node/node-${arch}"
+                chmod +x "vendor/node/node-${arch}"
+              done
+              cp "/tmp/nodebin-arm64/node-v${ver}-darwin-arm64/LICENSE" vendor/node/LICENSE
+              ;;
+          esac
+          ls -la vendor/node
 
       - name: Setup Rust targets (macOS universal)
         if: matrix.os == 'macos-latest'

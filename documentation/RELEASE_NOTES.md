@@ -1,5 +1,36 @@
 # Release Notes
 
+## v3.4.0 (2026-07-16)
+
+**Zero-dependency: the Node.js runtime is now bundled inside the installer.**
+
+v3.3.0 embedded the MCP server code (`dist/` + `node_modules/`) but still
+required the user to have **Node.js 22+ installed** on their machine, because
+the launcher executed the system `node`. For non-technical users this was
+unusable. v3.4.0 ships the official Node LTS binary inside the app and the
+launcher uses that instead — no Node install required.
+
+Changes:
+- CI downloads the official Node 22 (LTS) binary per platform into
+  `vendor/node/` (`node.exe` on Windows, `node` on Linux, `node-arm64` +
+  `node-x64` on macOS for the universal build) and bundles it as a Tauri
+  resource. Node's `LICENSE` (MIT) is included for attribution.
+- `find_bundled_node()` (src-tauri/src/lib.rs) resolves the bundled node
+  (honouring the Tauri v2 `_up_/` resource mapping) and the launcher prefers
+  it over any `node` in PATH. On macOS the correct arch is picked at runtime;
+  on Unix the executable bit is ensured before spawn. PATH is kept only as a
+  dev-mode fallback.
+- Because both the runtime and the `better-sqlite3` native binary now come from
+  the same Node 22 ABI (127), there is no longer an ABI-mismatch risk at
+  runtime.
+
+Trade-offs:
+- Installer size grows by the Node binary size (~70 MB Windows, similar on
+  other platforms).
+- macOS is not code-signed: Gatekeeper may still prompt. The bundled node is
+  executed from inside the already-approved `.app`, which normally works, but
+  this is a known unsigned-app caveat.
+
 ## v3.3.0 (2026-07-12)
 
 **The Node MCP server is now bundled inside the installer.**

@@ -75,8 +75,9 @@ fn no_window(_cmd: &mut Command) {}
 
 static NODE_PATH: OnceLock<Option<String>> = OnceLock::new();
 
-fn cached_node_path() -> Option<String> {
-    NODE_PATH.get_or_init(find_node).clone()
+fn cached_node_path(app: &AppHandle) -> Option<String> {
+    let app = app.clone();
+    NODE_PATH.get_or_init(move || find_node(&app)).clone()
 }
 
 static HTTP_CLIENT: OnceLock<Option<reqwest::blocking::Client>> = OnceLock::new();
@@ -188,7 +189,7 @@ fn get_status(app: AppHandle) -> StatusReport {
         },
         install_dir: install_dir.to_string_lossy().to_string(),
         workspace_dir: workspace_dir_from_env().map(|p| p.to_string_lossy().to_string()),
-        node_path: cached_node_path(),
+        node_path: cached_node_path(&app),
         dist_index_path: index_js
             .as_ref()
             .map(|p| p.to_string_lossy().to_string())
@@ -315,14 +316,66 @@ fn uninstall_app(app: AppHandle) -> Result<(), String> {
 
 // ---------- node / mcp child ----------
 
-fn find_node() -> Option<String> {
+fn find_node(app: &AppHandle) -> Option<String> {
+    // Prefer the bundled Node runtime (no user-side dependency; its ABI matches
+    // the bundled better-sqlite3 prebuilt). Fall back to PATH only in dev mode.
+    if let Some(n) = find_bundled_node(app) {
+        return Some(n);
+    }
     let cmd_name = if cfg!(windows) { "node.exe" } else { "node" };
-    let path = std::env::var_os("PATH")?;
-    for dir in std::env::split_paths(&path) {
-        let candidate = dir.join(cmd_name);
-        if candidate.is_file() {
-            if node_version_ok(&candidate.to_string_lossy()) {
+    if let Some(path) = std::env::var_os("PATH") {
+        for dir in std::env::split_paths(&path) {
+            let candidate = dir.join(cmd_name);
+            if candidate.is_file() && node_version_ok(&candidate.to_string_lossy()) {
                 return Some(candidate.to_string_lossy().into_owned());
+            }
+        }
+    }
+    None
+}
+
+fn find_bundled_node(app: &AppHandle) -> Option<String> {
+    let install = launcher_install_dir(app);
+    // Tauri v2 maps "../" resource globs into "_up_/". The bundled node ships
+    // under <install>/_up_/vendor/node/ (Win/Linux) or
+    // <resource_dir>/_up_/vendor/node/ (macOS .app bundle).
+    let mut bases: Vec<PathBuf> = vec![
+        install.join("_up_").join("vendor").join("node"),
+        install.join("vendor").join("node"),
+    ];
+    if let Ok(res) = app.path().resource_dir() {
+        bases.push(res.join("_up_").join("vendor").join("node"));
+        bases.push(res.join("vendor").join("node"));
+    }
+
+    // macOS universal app: pick the right arch at runtime.
+    let mut names: Vec<PathBuf> = Vec::new();
+    if cfg!(target_os = "macos") {
+        names.push(PathBuf::from(if std::env::consts::ARCH == "aarch64" {
+            "node-arm64"
+        } else {
+            "node-x64"
+        }));
+    } else if cfg!(windows) {
+        names.push(PathBuf::from("node.exe"));
+    } else {
+        names.push(PathBuf::from("node"));
+    }
+
+    for base in &bases {
+        for name in &names {
+            let p = base.join(name);
+            if p.is_file() {
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let _ =
+                        std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755));
+                }
+                let s = p.to_string_lossy().into_owned();
+                if node_version_ok(&s) {
+                    return Some(s);
+                }
             }
         }
     }
@@ -341,7 +394,7 @@ fn node_version_ok(node: &str) -> bool {
         let s = s.trim();
         if let Some(rest) = s.strip_prefix("v") {
             if let Some((major, _)) = rest.split_once('.') {
-                return major.parse::<u32>().map(|n| n >= 18).unwrap_or(false);
+                return major.parse::<u32>().map(|n| n >= 22).unwrap_or(false);
             }
         }
     }
@@ -406,8 +459,8 @@ fn find_llama_server(app: &AppHandle) -> Option<PathBuf> {
 }
 
 fn start_mcp_child(app: &AppHandle) -> Result<(), String> {
-    let node = cached_node_path()
-        .ok_or_else(|| "node (>=18) not found in PATH".to_string())?;
+    let node = cached_node_path(app)
+        .ok_or_else(|| "bundled node runtime not found".to_string())?;
     let index_js = find_index_js(app)
         .ok_or_else(|| "dist/index.js not found beside the launcher".to_string())?;
 
