@@ -1,5 +1,28 @@
 # Release Notes
 
+## v3.4.1 (2026-07-17)
+
+**Fix: MCP server died instantly on Start in the installed app.**
+
+v3.4.0 bundled the Node runtime correctly, but the launcher spawned the
+MCP server with `stdin(Stdio::null())`. The MCP server uses
+`StdioServerTransport` and registers `process.stdin.on("end", ...)`;
+null stdin triggers an immediate EOF → `process.exit(0)`. The server
+appeared to start but was dead within milliseconds, leaving the status
+showing "stopped".
+
+Changes:
+- `start_mcp_child`: `stdin(Stdio::piped())` — the pipe stays open as
+  long as the `Child` handle is alive, keeping the server running.
+- Dev builds (`cfg!(debug_assertions)`) now inherit stdout/stderr so
+  MCP server errors are visible in the `tauri dev` terminal.
+- `find_index_js` / `find_llama_server`: added upward directory
+  traversal from the exe for dev-mode path resolution.
+- Removed `devUrl` from `tauri.conf.json` — the static frontend needs
+  no dev server; `tauri dev` now loads `frontendDist` directly.
+- Added custom `get_version` Tauri command (replaces missing
+  `plugin:app|get_version`).
+
 ## v3.4.0 (2026-07-16)
 
 **Zero-dependency: the Node.js runtime is now bundled inside the installer.**

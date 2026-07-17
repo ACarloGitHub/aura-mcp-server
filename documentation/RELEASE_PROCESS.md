@@ -14,6 +14,37 @@ e validata con v3.1.0 (2026-07-10).
 - Token GitHub con scope `repo` (per la CLI `gh`).
 - `gh` autenticato (`gh auth status` deve mostrare l'account giusto).
 
+## Step 0 — Test in locale (PRIMA di ogni release)
+
+Per evitare il ciclo release→install→fail→repeat, testa sempre l'app in
+locale con `tauri dev` prima di taggare.
+
+```bash
+# 1. Assicurati che dist/index.js sia aggiornato
+npm run build
+
+# 2. Lancia l'app in dev mode (compila Rust in debug + apre la finestra)
+npm run tauri dev
+```
+
+Cosa verificare nella finestra che si apre:
+
+- **Status**: `dist/index.js` trovato, `node_path` valorizzato.
+- **Start**: clicca Start → il server MCP resta attivo (status = running).
+  In dev mode, stdout/stderr del server sono visibili nel terminale.
+- **Stop**: clicca Stop → il server si ferma (status = stopped).
+
+Se Start non funziona (status rimane stopped), controlla il terminale:
+gli errori del server MCP sono visibili in dev mode.
+
+**Nota tecnica**: `start_mcp_child` usa `stdin(Stdio::piped())` per
+mantenere il server in vita. Il server MCP esce quando stdin chiude
+(`process.stdin 'end'`). `Stdio::null()` causerebbe l'uscita immediata.
+
+**Path resolution in dev**: `find_index_js` e `find_llama_server`
+camminano verso l'alto dall'eseguibile (`src-tauri/target/debug/`) per
+trovare `dist/index.js` e `vendor/llama.cpp/` nella root del repo.
+
 ## Step 1 — Verifica pre-flight (PRIMA del tag)
 
 Controlla queste cose **prima** di pushare il tag, perché dopo è più
@@ -334,9 +365,72 @@ già usata per `../vendor/llama.cpp` in `find_llama_server` (motivo per cui
 llama-server veniva trovato ma dist/index.js no: il bundle di dist è nuovo
 in v3.3.0, quello di llama.cpp esiste da prima).
 
-> **Caveat ABI**: il binario nativo di `better-sqlite3` è pinzato all'ABI
-> del node di build (Node 22 = ABI 127). L'app richiede **Node 22+**
-> installato sulla macchina utente (il launcher esegue il `node` nel PATH).
+> **Caveat ABI (pre-v3.4.0)**: nelle versioni precedenti a v3.4.0 il binario
+> nativo di `better-sqlite3` era pinzato all'ABI del node di build (Node 22 =
+> ABI 127) e l'app richiedeva Node 22+ installato sulla macchina utente.
+> **Da v3.4.0** il runtime Node 22 è **bundled** nell'installer (vedi
+> `vendor/node/` e `find_bundled_node` in `lib.rs`): nessuna dipendenza esterna.
+
+### 12. `stdin(Stdio::null())` uccide il server MCP immediatamente
+
+Sintomo: l'utente clicca Start, lo status mostra "running" per un istante,
+poi torna subito "stopped". Nessun errore visibile (stdout/stderr erano
+anch'essi `null`).
+
+Causa: il server MCP usa `StdioServerTransport` (protocollo JSON-RPC su
+stdin/stdout). Il codice TypeScript registra:
+
+```typescript
+process.stdin.on("end",  () => cleanupAndExit("stdin end"));
+process.stdin.on("close", () => cleanupAndExit("stdin close"));
+```
+
+Con `stdin(Stdio::null())`, il child riceve un EOF immediato su stdin →
+l'evento `end` scatta → `process.exit(0)`. Il processo nasce e muore
+in millisecondi. `mcp_running()` (`try_wait()`) vede il child già
+terminato → status = stopped.
+
+**Fix**: `stdin(Stdio::piped())`. La pipe resta aperta finché il
+`Child` è vivo (memorizzato in `MCP_CHILD`). Il server non riceve EOF e
+ resta in attesa di messaggi MCP. `stop_mcp_child()` poi chiama
+`child.kill()` (SIGTERM), gestito dal server con cleanup ordinato.
+
+Inoltre, nei **dev build** (`cfg!(debug_assertions)`), stdout/stderr sono
+`Stdio::inherit()` così gli errori del server sono visibili nel terminale
+di `tauri dev`. Nei release build rimangono `null`.
+
+### 13. `devUrl` impediva `tauri dev` con frontend statico
+
+Sintomo: `npm run tauri dev` apriva una finestra vuota (nessun contenuto).
+
+Causa: `tauri.conf.json` aveva `devUrl: "http://localhost:1420"` ma
+il frontend è statico (HTML/CSS/JS in `src-tauri/dist/`), senza dev
+server (Vite, webpack...). Tauri cercava di caricare localhost:1420
+che non rispondeva.
+
+**Fix**: rimosso `devUrl`. Senza `devUrl`, `tauri dev` serve
+`frontendDist` direttamente via asset protocol. Il campo è opzionale in
+Tauri v2: serve solo se si ha un framework con HMR (Vite, Next, ecc.).
+
+### 14. Path resolution in dev mode (`find_index_js`, `find_llama_server`)
+
+In dev mode l'eseguibile è in `src-tauri/target/debug/`. I path di
+installazione (`<exe_dir>/dist/index.js`, `<exe_dir>/_up_/dist/...`)
+non trovano `dist/index.js` che si trova nella **root del repo**.
+
+**Fix**: entrambe le funzioni fanno un **walk-up** dall'eseguibile verso
+l'alto fino a trovare il file cercato. Questo copre sia dev mode
+(`src-tauri/target/debug/` → `target/` → `src-tauri/` → `<repo>/`) sia
+installato. Il walk-up è l'ultima risorsa, dopo i path di installazione.
+
+### 15. `plugin:app|get_version` richiede plugin registrato (TODO)
+
+Il frontend chiama `invoke("plugin:app|get_version")` ma il plugin
+`tauri-plugin-app` non è né in `Cargo.toml` né registrato nel
+`Builder::default()`. Errore: "Command not found".
+
+**Fix (da fare)**: aggiungere `tauri-plugin-app` alle dipendenze
+Cargo.toml e `.plugin(tauri_plugin_app::init())` nel builder.
 
 ## Procedura riassunta (TL;DR)
 

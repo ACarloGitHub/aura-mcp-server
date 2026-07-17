@@ -285,7 +285,7 @@
   // --- try built-in command to validate IPC channel ---
   try {
     const v = await Promise.race([
-      invoke("plugin:app|get_version"),
+      invoke("get_version"),
       new Promise((_, rej) =>
         setTimeout(() => rej(new Error("timeout 5s")), 5000),
       ),

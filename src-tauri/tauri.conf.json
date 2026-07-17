@@ -1,13 +1,12 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "AuraMCP",
-  "version": "3.4.0",
+  "version": "3.4.1",
   "identifier": "com.auramcp.server",
   "build": {
     "beforeDevCommand": "npm run build",
     "beforeBuildCommand": "",
-    "frontendDist": "./dist",
-    "devUrl": "http://localhost:1420"
+    "frontendDist": "./dist"
   },
   "app": {
     "withGlobalTauri": true,

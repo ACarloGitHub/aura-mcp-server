@@ -200,6 +200,11 @@ fn get_status(app: AppHandle) -> StatusReport {
 }
 
 #[tauri::command]
+fn get_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
+#[tauri::command]
 fn start_server(app: AppHandle) -> Result<(), String> {
     eprintln!("[AuraMCP IPC] start_server called");
     if mcp_running() {
@@ -416,9 +421,20 @@ fn find_index_js(app: &AppHandle) -> Option<PathBuf> {
         candidates.push(res.join("_up_").join("dist").join("index.js"));
         candidates.push(res.join("dist").join("index.js"));
     }
-    for p in candidates {
+    for p in &candidates {
         if p.is_file() {
-            return Some(p);
+            return Some(p.clone());
+        }
+    }
+    // Dev mode: walk up from the exe to find the project root's dist/index.js
+    if let Ok(exe) = std::env::current_exe() {
+        let mut dir = exe.parent().map(|p| p.to_path_buf());
+        while let Some(d) = dir {
+            let candidate = d.join("dist").join("index.js");
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+            dir = d.parent().map(|p| p.to_path_buf());
         }
     }
     None
@@ -455,6 +471,17 @@ fn find_llama_server(app: &AppHandle) -> Option<PathBuf> {
             }
         }
     }
+    // Dev mode: walk up from exe to find vendor/llama.cpp in the project root
+    if let Ok(exe) = std::env::current_exe() {
+        let mut dir = exe.parent().map(|p| p.to_path_buf());
+        while let Some(d) = dir {
+            let candidate = d.join("vendor").join("llama.cpp").join(plat).join(exe_name);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+            dir = d.parent().map(|p| p.to_path_buf());
+        }
+    }
     None
 }
 
@@ -466,10 +493,18 @@ fn start_mcp_child(app: &AppHandle) -> Result<(), String> {
 
     let mut cmd = Command::new(&node);
     cmd.arg(&index_js)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .stdin(Stdio::null());
+        // piped stdin keeps the pipe open — the MCP server exits on stdin
+        // EOF (process.stdin 'end'/'close').  null would kill it instantly.
+        .stdin(Stdio::piped());
     no_window(&mut cmd);
+
+    // In dev builds, inherit stdout/stderr so server errors are visible in
+    // the `tauri dev` terminal.  In release, suppress them.
+    if cfg!(debug_assertions) {
+        cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
+    } else {
+        cmd.stdout(Stdio::null()).stderr(Stdio::null());
+    }
 
     if let Some(parent) = index_js.parent() {
         let _ = cmd.current_dir(parent.parent().unwrap_or(parent));
@@ -710,6 +745,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
+            get_version,
             get_status,
             start_server,
             stop_server,
