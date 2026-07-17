@@ -138,26 +138,6 @@ let TOOLS: Tool[] = [
       },
       required: ["action"],
     },
-    outputSchema: {
-      type: "object",
-      properties: {
-        total: { type: "number" },
-        shown: { type: "number" },
-        pages: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              path: { type: "string" },
-              title: { type: "string" },
-              modified: { type: "string" },
-            },
-            required: ["path", "title", "modified"],
-          },
-        },
-      },
-      required: ["total", "shown", "pages"],
-    },
   },
   {
     name: "wiki_ingest",
@@ -191,27 +171,6 @@ let TOOLS: Tool[] = [
       },
       required: ["action"],
     },
-    outputSchema: {
-      type: "object",
-      properties: {
-        collection: { type: "string" },
-        query: { type: "string" },
-        count: { type: "number" },
-        results: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              text: { type: "string" },
-              distance: { type: ["number", "null"] },
-              metadata: { type: "object" },
-            },
-            required: ["text", "metadata"],
-          },
-        },
-      },
-      required: ["collection", "query", "count", "results"],
-    },
   },
   {
     name: "planner",
@@ -225,18 +184,6 @@ let TOOLS: Tool[] = [
         answer: { type: "string", description: "Answer to a blocking question (action=next, optional)" },
       },
       required: ["action"],
-    },
-    outputSchema: {
-      type: "object",
-      properties: {
-        name: { type: "string" },
-        total: { type: "number" },
-        completed: { type: "number" },
-        remaining: { type: "number" },
-        percentage: { type: "number" },
-        blockingQuestion: { type: ["string", "null"] },
-      },
-      required: ["name", "total", "completed", "remaining", "percentage"],
     },
   },
   {

@@ -1,5 +1,20 @@
 # Release Notes
 
+## v3.4.3 (2026-07-17)
+
+**Fix: MCP tools rejected by strict clients (LM Studio) due to outputSchema mismatch.**
+
+The `planner`, `wiki`, and `rag` tools declared an `outputSchema` designed
+for only one action each (`status`, `list`, `search` respectively), but all
+other actions returned text-only responses. Strict MCP clients like LM
+Studio enforce outputSchema validation and rejected these responses with
+`MCP error -32600: output schema but did not return structured content`.
+
+Fix: removed `outputSchema` from these three multi-action tools. All actions
+now return text content without schema enforcement. The actions that
+previously included `structuredContent` still do so (harmlessly ignored
+without a declared schema).
+
 ## v3.4.2 (2026-07-17)
 
 **Zero-config: auto-registers in LM Studio, no manual JSON editing.**
