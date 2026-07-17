@@ -6,14 +6,17 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that gives yo
 
 <p align="center">
   <a href="#installation"><img src="https://img.shields.io/badge/Install-Download_Latest-4299E1?style=for-the-badge" alt="Install"></a>
-  <a href="#requirements"><img src="https://img.shields.io/badge/Requires-Node.js_18%2B-48BB78?style=for-the-badge" alt="Requirements"></a>
+  <a href="#requirements"><img src="https://img.shields.io/badge/Requires-Nothing_(Node_bundled)-48BB78?style=for-the-badge" alt="Requirements"></a>
   <a href="#privacy"><img src="https://img.shields.io/badge/Privacy-100%25_Local-E53E3E?style=for-the-badge" alt="Privacy"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-F6E05E?style=for-the-badge" alt="License"></a>
+  <a href="https://www.patreon.com/c/PatataLab"><img src="https://img.shields.io/badge/Patreon-Support-FF424D?style=for-the-badge&logo=patreon&logoColor=white" alt="Patreon"></a>
+  <a href="https://buymeacoffee.com/patatalab"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-%23FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy Me A Coffee"></a>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/typescript-5.0+-blue?logo=typescript&logoColor=white" alt="TypeScript">
-  <img src="https://img.shields.io/badge/node.js-18+-green?logo=node.js&logoColor=green" alt="Node.js">
+  <img src="https://img.shields.io/badge/node.js-22_LTS_(bundled)-green?logo=node.js&logoColor=green" alt="Node.js">
+  <img src="https://img.shields.io/badge/Rust-Tauri_2-orange?logo=rust&logoColor=white" alt="Rust">
   <img src="https://img.shields.io/badge/MCP_SDK-1.0-8B5CF6" alt="MCP SDK">
   <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey" alt="Platform">
   <img src="https://img.shields.io/badge/Privacy-Local_Only-red" alt="Privacy">
@@ -36,7 +39,8 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that gives yo
 
 ## Requirements
 
-- **Node.js 18+** (only needed if you run from source — the bundled installer bundles Node.js spawning logic)
+- **Nothing.** The installer bundles the Node.js LTS runtime — no
+  user-side Node install required.
 - **AnythingLLM Desktop 1.8+** or **LM Studio 0.3.17+**
 - **A workspace directory** (any empty folder; the agent will populate it on first boot)
 
@@ -45,24 +49,64 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that gives yo
 ### Recommended: download the bundled installer
 
 Grab the latest release for your platform from
-[GitHub Releases](https://github.com/ACarloGitHub/aura-mcp-server/releases):
+[GitHub Releases](https://github.com/ACarloGitHub/aura-mcp-server/releases/latest):
 
-- **Windows**: `AuraMCP_3.1.0_x64-setup.exe` (NSIS) or `AuraMCP_3.1.0_x64_en-US.msi` (WiX)
-- **macOS**: `AuraMCP_3.1.0_universal.dmg` (Intel + Apple Silicon)
-- **Linux**: `AuraMCP_3.1.0_amd64.deb` or `AuraMCP-3.1.0-1.x86_64.rpm`
+- **Windows**: `AuraMCP_x64-setup.exe` (NSIS) or `AuraMCP_x64_en-US.msi` (WiX)
+- **macOS**: `AuraMCP_universal.dmg` (Intel + Apple Silicon)
+- **Linux**: `AuraMCP_amd64.deb` or `AuraMCP_x86_64.rpm`
 
-The installer launches `AuraMCP`, a small tray-resident program that:
+The installer bundles the **Node.js LTS runtime** (~70 MB) so the MCP
+server runs with zero external dependencies. On launch, AuraMCP:
 
-1. **On first launch**, shows a one-time setup dialog asking to download the
-   embedding model (~488 MB). After confirming, the model downloads into the
-   per-user app data directory and the server starts automatically.
-2. **On every launch**, spawns the Node.js MCP server in the background and
-   stays resident so the host application can reach it via stdio.
-3. **On exit**, cleanly shuts down the MCP server and the embedded
-   `llama.cpp` embedding backend (if RAG was used).
+1. **Auto-registers** itself in LM Studio (`~/.cache/lm-studio/mcp.json`)
+   if detected — no manual JSON editing needed.
+2. **Spawns** the Node.js MCP server in the background and stays
+   resident in the system tray.
+3. **On first launch**, shows a one-time dialog to download the embedding
+   model (~488 MB) for RAG.
+4. **On exit**, cleanly shuts down the MCP server and the embedded
+   `llama.cpp` embedding backend.
 
-The installer registers `AuraMCP` in the system tray. Right-click the tray
-icon to stop the server or quit.
+### How MCP clients connect
+
+AuraMCP exposes a `--serve` mode: the MCP client (LM Studio, Claude
+Desktop, etc.) calls `AuraMCP.exe --serve` and the exe resolves the
+bundled Node runtime and `dist/index.js` internally. The config entry
+is written automatically:
+
+```json
+{
+  "mcpServers": {
+    "auramcp-server": {
+      "command": "C:\\path\\to\\AuraMCP.exe",
+      "args": ["--serve"],
+      "env": {
+        "AGENT_WORKSPACE": "C:\\path\\to\\Workspace"
+      }
+    }
+  }
+}
+```
+
+The "Wire into your MCP host" tab in the AuraMCP window shows the exact
+JSON to paste manually if auto-registration is not available.
+
+### The AuraMCP Control Panel
+
+The installer adds a desktop shortcut and start-menu entry for
+**AuraMCP**. When you launch it, a compact control panel opens:
+
+| Tab | What it does |
+|-----|-------------|
+| **Status** | Shows MCP server status (running / stopped), embedding backend status, workspace path, log file path. Start and stop the server manually. |
+| **LM Studio** | Shows whether LM Studio was auto-detected and whether the MCP config was written. Displays the exact `mcp.json` path and a copy-to-clipboard button for the JSON entry. |
+| **AnythingLLM** | Same for AnythingLLM: detects the install, shows the `anythingllm_mcp_servers.json` path, copy-to-clipboard JSON. |
+| **Embedding Model** | Shows download status and file size. If the model is missing, a "Download" button starts the fetch (~488 MB). |
+
+AuraMCP also runs as a **system tray icon** — right-click to start/stop
+the server, open the control panel, or quit. On launch it
+auto-registers itself in LM Studio (if installed) so no manual config
+editing is required.
 
 ### Alternative: run from source
 
@@ -86,20 +130,20 @@ paste into AnythingLLM or LM Studio.
 
 ## Configuration
 
-After the installer has run once (or after starting the server manually),
-point your MCP host at AuraMCP:
+When you launch AuraMCP, it **auto-registers** in LM Studio (and writes
+the per-plugin bridge config) if it detects an installation. No manual
+JSON editing is required.
+
+If you prefer to configure manually, or your MCP host is not
+auto-detected:
 
 - **AnythingLLM**: edit `<storage>/plugins/anythingllm_mcp_servers.json`
-- **LM Studio**: edit `~/.lmstudio/mcp.json` (Windows: `%USERPROFILE%\.lmstudio\mcp.json`)
+- **LM Studio**: edit `~/.cache/lm-studio/mcp.json`
+  (Windows: `%USERPROFILE%\.cache\lm-studio\mcp.json`)
 
-Both hosts follow the same `mcpServers: { name: { command, args, env } }`
-shape. See [documentation/setup.md](documentation/setup.md) for full
-examples and the difference between the two hosts' startup behaviour.
-
-A starter template lives at
-[`lm-studio-config.example.json`](lm-studio-config.example.json) in this
-repo. Copy it, fill in your paths, save as `lm-studio-config.json`
-(next to `dist/index.js`), and reference it from your host's config.
+Both hosts use the same `mcpServers` shape and the same command —
+`AuraMCP.exe --serve` (or the equivalent path on macOS / Linux). See
+[documentation/setup.md](documentation/setup.md) for full examples.
 
 ### AnythingLLM API (optional)
 
@@ -159,7 +203,7 @@ user.
 | `EMBED_GGUF` | auto-detected | Path to the `nomic-embed-text-v2-moe.Q8_0.gguf` model. |
 | `EMBED_HOST` / `EMBED_PORT` | `127.0.0.1` / `11434` | Embedding server bind address. |
 | `RAG_DATA_DIR` | `{workspace}/rag/rag_data` | sqlite-vec vector index directory. |
-| `LM_STUDIO_CONVERSATIONS_DIR` | `~/.lmstudio/conversations` | LM Studio sessions directory. |
+| `LM_STUDIO_CONVERSATIONS_DIR` | `~/.cache/lm-studio/conversations` | LM Studio sessions directory. |
 | `MCP_DEBUG` | unset | Set to `1` for verbose debug logging. |
 | `MCP_DISABLE_AUTONOTIFY` | unset | Set to `1` to suppress desktop notifications. |
 | `MCP_LOG_MAX_MB` | `10` | Soft cap on `mcp-server.log` before rotation. |

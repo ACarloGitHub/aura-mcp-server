@@ -1,11 +1,11 @@
 {
-  "_comment": "Starter template for AuraMCP's MCP config. Replace /absolute/path/to/aura-mcp-server with the directory where the project lives (the bundle installer places it under %APPDATA%\\com.auramcp.server\\ on Windows, ~/Library/Application Support/com.auramcp.server/ on macOS, ~/.local/share/com.auramcp.server/ on Linux). Replace /absolute/path/to/your/workspace with the empty directory the agent will populate on first boot. On Windows use double backslashes in JSON strings: 'C:\\\\Users\\\\you\\\\workspace'. On Linux/macOS use forward slashes: '/home/you/workspace'. This template works for both AnythingLLM and LM Studio; AnythingLLM reads the same file as LM Studio (mcpServers shape), AnythingLLM's file lives under <storage>/plugins/anythingllm_mcp_servers.json. ANYTHINGLLM_API_KEY is only required if you use the 'anythingllm' tool (chat export); you can also drop it in api-key.json instead.",
+  "_comment": "Starter template for AuraMCP's MCP config. AuraMCP auto-registers itself in LM Studio on launch, so this template is only needed for manual setup or non-auto-detected hosts. Replace C:\\path\\to\\AuraMCP.exe with the actual install path (shown in the AuraMCP control panel). Replace C:\\path\\to\\your\\workspace with the empty directory the agent will populate on first boot. On Windows use double backslashes in JSON strings: 'C:\\\\Users\\\\you\\\\workspace'. On Linux/macOS use forward slashes: '/home/you/workspace'. ANYTHINGLLM_API_KEY is only required if you use the 'anythingllm' tool (chat export); you can also drop it in api-key.json instead.",
   "mcpServers": {
     "auramcp-server": {
-      "command": "node",
-      "args": ["/absolute/path/to/aura-mcp-server/dist/index.js"],
+      "command": "C:\\path\\to\\AuraMCP.exe",
+      "args": ["--serve"],
       "env": {
-        "AGENT_WORKSPACE": "/absolute/path/to/your/workspace",
+        "AGENT_WORKSPACE": "C:\\path\\to\\your\\workspace",
         "ANYTHINGLLM_API_KEY": "your-anythingllm-api-key-here"
       }
     }

@@ -13,10 +13,8 @@ application (AnythingLLM Desktop or LM Studio).
 
 ## Requirements
 
-- **Node.js 18+** — only required for the "run from source" path. The
-  bundled installer embeds Node.js spawning logic but still requires a
-  Node.js runtime to be present on the host machine for the MCP server
-  child process.
+- **Nothing.** The installer bundles the **Node.js LTS runtime** — no
+  user-side Node.js install required.
 - **AnythingLLM Desktop 1.8+** or **LM Studio 0.3.17+**.
 - **A workspace directory** (any empty folder; the agent populates it
   on first boot).
@@ -28,11 +26,11 @@ application (AnythingLLM Desktop or LM Studio).
 Grab the latest release for your platform from
 [GitHub Releases](https://github.com/ACarloGitHub/aura-mcp-server/releases/latest):
 
-- **Windows**: `AuraMCP_3.1.0_x64-setup.exe` (NSIS, recommended) or
-  `AuraMCP_3.1.0_x64_en-US.msi` (WiX).
-- **macOS**: `AuraMCP_3.1.0_universal.dmg` (Intel + Apple Silicon).
-- **Linux**: `AuraMCP_3.1.0_amd64.deb` (Debian/Ubuntu) or
-  `AuraMCP-3.1.0-1.x86_64.rpm` (Fedora/RHEL).
+- **Windows**: `AuraMCP_x64-setup.exe` (NSIS, recommended) or
+  `AuraMCP_x64_en-US.msi` (WiX).
+- **macOS**: `AuraMCP_universal.dmg` (Intel + Apple Silicon).
+- **Linux**: `AuraMCP_amd64.deb` (Debian/Ubuntu) or
+  `AuraMCP_x86_64.rpm` (Fedora/RHEL).
 
 ### 2. Install
 
@@ -62,8 +60,12 @@ immediately.
 
 ### 4. Wire into your MCP host
 
-The installer creates `dist/index.js` and (on Windows / macOS) registers
-the launcher. You still need to tell your MCP host to spawn it. See
+The installer bundles the Node.js LTS runtime and registers the
+launcher. On startup, AuraMCP **auto-detects** LM Studio and writes
+the correct MCP config automatically — no manual editing needed.
+
+If auto-registration is not available (e.g. the host is installed
+after AuraMCP, or you use a different MCP client), see
 [Wire into AnythingLLM](#wire-into-anythingllm) or
 [Wire into LM Studio](#wire-into-lm-studio) below.
 
@@ -78,25 +80,25 @@ AnythingLLM stores its MCP server list at
 - **macOS**: `~/Library/Application Support/anythingllm-desktop/storage/`
 - **Linux**: `~/.local/share/anythingllm-desktop/storage/`
 
-Edit (or create) the file:
+Edit (or create) the file — use the AuraMCP executable with `--serve`:
 
 ```json
 {
   "mcpServers": {
     "auramcp-server": {
-      "command": "node",
-      "args": ["/path/to/aura-mcp-server/dist/index.js"],
+      "command": "C:\\path\\to\\AuraMCP.exe",
+      "args": ["--serve"],
       "env": {
-        "AGENT_WORKSPACE": "/path/to/your/workspace"
+        "AGENT_WORKSPACE": "C:\\path\\to\\your\\workspace"
       }
     }
   }
 }
 ```
 
-Replace `/path/to/aura-mcp-server` with the directory where the
-installer placed the project (or where you cloned it), and
-`/path/to/your/workspace` with an empty directory of your choice.
+Replace `C:\\path\\to\\AuraMCP.exe` with the actual install path (shown
+in the AuraMCP control panel under the AnythingLLM tab), and
+`AGENT_WORKSPACE` with an empty directory of your choice.
 
 AnythingLLM's MCP Management UI (Settings → MCP Servers) shows all
 detected servers, their status, error logs and lets you reload or
@@ -110,9 +112,9 @@ resource-constrained machines), add:
 {
   "mcpServers": {
     "auramcp-server": {
-      "command": "node",
-      "args": ["/path/to/aura-mcp-server/dist/index.js"],
-      "env": { "AGENT_WORKSPACE": "/path/to/your/workspace" },
+      "command": "C:\\path\\to\\AuraMCP.exe",
+      "args": ["--serve"],
+      "env": { "AGENT_WORKSPACE": "C:\\path\\to\\your\\workspace" },
       "anythingllm": { "autoStart": false }
     }
   }
@@ -123,8 +125,12 @@ resource-constrained machines), add:
 
 LM Studio stores its MCP config at:
 
-- **Windows**: `%USERPROFILE%\.lmstudio\mcp.json`
-- **macOS / Linux**: `~/.lmstudio/mcp.json`
+- **Windows**: `%USERPROFILE%\.cache\lm-studio\mcp.json`
+- **macOS / Linux**: `~/.cache/lm-studio/mcp.json`
+
+> **Auto-registration**: on launch, AuraMCP detects LM Studio and
+> writes this file automatically. The section below is for manual
+> configuration only.
 
 LM Studio 0.3.17+ also exposes an in-app editor: **Program tab →
 Install → Edit mcp.json**. Either edit via the UI or the file directly.
@@ -133,15 +139,19 @@ Install → Edit mcp.json**. Either edit via the UI or the file directly.
 {
   "mcpServers": {
     "auramcp-server": {
-      "command": "node",
-      "args": ["/path/to/aura-mcp-server/dist/index.js"],
+      "command": "C:\\path\\to\\AuraMCP.exe",
+      "args": ["--serve"],
       "env": {
-        "AGENT_WORKSPACE": "/path/to/your/workspace"
+        "AGENT_WORKSPACE": "C:\\path\\to\\your\\workspace"
       }
     }
   }
 }
 ```
+
+Replace `C:\\path\\to\\AuraMCP.exe` with the actual install path (shown
+in the AuraMCP control panel under the LM Studio tab), and
+`AGENT_WORKSPACE` with an empty directory of your choice.
 
 LM Studio auto-reloads the file whenever you save it. Tools appear
 under the Program tab; the model's chat shows a confirmation dialog
@@ -255,7 +265,8 @@ workspace state.
 ## Troubleshooting
 
 - **Server does not start** — open the host's MCP panel and check the
-  error log. Most common cause: wrong path in `args` or missing Node.js.
+  error log. If running manually, verify the path in `command` points
+  to the installed `AuraMCP.exe` and that `--serve` is in `args`.
 - **Unknown tool: \<name\>** — the host cached an old tool list. Close
   and reopen the MCP panel.
 - **Sandbox: Path outside AGENT_WORKSPACE** — the model tried to read
@@ -277,12 +288,24 @@ git clone https://github.com/ACarloGitHub/aura-mcp-server.git
 cd aura-mcp-server
 npm install
 npm run build
+```
+
+You can then either run the Node server directly:
+
+```bash
 node dist/index.js
 ```
 
+or launch the Tauri desktop launcher in dev mode:
+
+```bash
+npm run tauri dev
+```
+
 The server reads `AGENT_WORKSPACE` from the environment (or falls back
-to the current working directory). Point your MCP host at the
-`dist/index.js` file as described above.
+to the current working directory). Point your MCP host at
+`dist/index.js` (direct node) or at the dev binary with `--serve`
+(Tauri dev mode).
 
 This path is intended for development and CI; the bundled installer
 is the supported way for end users.
