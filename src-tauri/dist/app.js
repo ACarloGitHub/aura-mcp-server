@@ -42,8 +42,8 @@
   function hostConfigPath(host) {
     if (host === "lmstudio") {
       return navigator.userAgent.includes("Windows")
-        ? "%USERPROFILE%\\.lmstudio\\mcp.json"
-        : "~/.lmstudio/mcp.json";
+        ? "%USERPROFILE%\\.cache\\lm-studio\\mcp.json"
+        : "~/.cache/lm-studio/mcp.json";
     }
     return "<storage>/plugins/anythingllm_mcp_servers.json";
   }
@@ -52,13 +52,13 @@
     return String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   }
 
-  function buildHostJson({ distIndexPath, workspaceDir, noAutoStart }) {
+  function buildHostJson({ exePath, workspaceDir, noAutoStart }) {
     const env = {
       AGENT_WORKSPACE: escapeForJson(workspaceDir),
     };
     const serverEntry = {
-      command: "node",
-      args: [escapeForJson(distIndexPath)],
+      command: escapeForJson(exePath),
+      args: ["--serve"],
       env,
     };
     if (noAutoStart) {
@@ -218,15 +218,15 @@
       const p = await invoke("get_install_paths");
       const workspace = p.workspace_default;
       els.lmstudioJson.textContent = buildHostJson({
-        distIndexPath: p.dist_index_path,
+        exePath: p.exe_path,
         workspaceDir: workspace,
       });
       els.anythingllmJson.textContent = buildHostJson({
-        distIndexPath: p.dist_index_path,
+        exePath: p.exe_path,
         workspaceDir: workspace,
       });
       els.anythingllmNoAutoStartJson.textContent = buildHostJson({
-        distIndexPath: p.dist_index_path,
+        exePath: p.exe_path,
         workspaceDir: workspace,
         noAutoStart: true,
       });

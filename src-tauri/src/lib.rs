@@ -256,9 +256,13 @@ fn get_install_paths(app: AppHandle) -> serde_json::Value {
     let dist = dist_index_path(&app);
     let workspace_default = workspace_dir_from_env()
         .unwrap_or_else(|| install_dir.join("Workspace"));
+    let exe_path = std::env::current_exe()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
     serde_json::json!({
         "install_dir": install_dir.to_string_lossy().to_string(),
         "dist_index_path": dist.to_string_lossy().to_string(),
+        "exe_path": exe_path,
         "workspace_default": workspace_default.to_string_lossy().to_string(),
         "workspace_source": if workspace_dir_from_env().is_some() { "env" } else { "default" },
     })
@@ -739,8 +743,250 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
+// ---------- standalone path helpers (no AppHandle needed) ----------
+
+fn standalone_install_dir() -> PathBuf {
+    std::env::current_exe()
+        .ok()
+        .and_then(|e| e.parent().map(|p| p.to_path_buf()))
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
+fn standalone_app_data_dir() -> PathBuf {
+    let id = "com.auramcp.server";
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            return PathBuf::from(appdata).join(id);
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(home) = std::env::var("HOME") {
+            return PathBuf::from(home).join("Library").join("Application Support").join(id);
+        }
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
+            return PathBuf::from(xdg).join(id);
+        }
+        if let Ok(home) = std::env::var("HOME") {
+            return PathBuf::from(home).join(".local/share").join(id);
+        }
+    }
+    PathBuf::from(".")
+}
+
+// ---------- --serve mode (stdio bridge for external MCP clients) ----------
+
+fn serve_stdio() -> ! {
+    let install = standalone_install_dir();
+
+    let node_name = if cfg!(windows) {
+        "node.exe"
+    } else if cfg!(target_os = "macos") {
+        if std::env::consts::ARCH == "aarch64" { "node-arm64" } else { "node-x64" }
+    } else {
+        "node"
+    };
+
+    let mut node: Option<String> = None;
+    for base in [
+        install.join("_up_").join("vendor").join("node"),
+        install.join("vendor").join("node"),
+    ] {
+        let p = base.join(node_name);
+        if p.is_file() {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755));
+            }
+            node = Some(p.to_string_lossy().into_owned());
+            break;
+        }
+    }
+    if node.is_none() {
+        let cmd = if cfg!(windows) { "node.exe" } else { "node" };
+        if let Some(path) = std::env::var_os("PATH") {
+            for dir in std::env::split_paths(&path) {
+                let candidate = dir.join(cmd);
+                if candidate.is_file() {
+                    node = Some(candidate.to_string_lossy().into_owned());
+                    break;
+                }
+            }
+        }
+    }
+    let node = match node {
+        Some(n) => n,
+        None => {
+            eprintln!("[AuraMCP serve] node runtime not found");
+            std::process::exit(1);
+        }
+    };
+
+    let mut index_js: Option<PathBuf> = None;
+    for candidate in [
+        install.join("_up_").join("dist").join("index.js"),
+        install.join("dist").join("index.js"),
+    ] {
+        if candidate.is_file() {
+            index_js = Some(candidate);
+            break;
+        }
+    }
+    if index_js.is_none() {
+        let mut dir = install.parent().map(|p| p.to_path_buf());
+        while let Some(d) = dir {
+            let candidate = d.join("dist").join("index.js");
+            if candidate.is_file() {
+                index_js = Some(candidate);
+                break;
+            }
+            dir = d.parent().map(|p| p.to_path_buf());
+        }
+    }
+    let index_js = match index_js {
+        Some(p) => p,
+        None => {
+            eprintln!("[AuraMCP serve] dist/index.js not found");
+            std::process::exit(1);
+        }
+    };
+
+    let cwd = index_js
+        .parent()
+        .and_then(|p| p.parent())
+        .unwrap_or(&install);
+
+    let gguf = standalone_app_data_dir().join("embeddings").join(NOMIC_GGUF_NAME);
+
+    let plat = if cfg!(target_os = "windows") { "windows" }
+        else if cfg!(target_os = "macos") { "macos" }
+        else { "linux" };
+    let llama_exe = if cfg!(windows) { "llama-server.exe" } else { "llama-server" };
+    let mut llama_bin: Option<PathBuf> = None;
+    for candidate in [
+        install.join("_up_").join("vendor").join("llama.cpp").join(plat).join(llama_exe),
+        install.join("vendor").join("llama.cpp").join(plat).join(llama_exe),
+    ] {
+        if candidate.is_file() {
+            llama_bin = Some(candidate);
+            break;
+        }
+    }
+    if llama_bin.is_none() {
+        let mut dir = install.parent().map(|p| p.to_path_buf());
+        while let Some(d) = dir {
+            let candidate = d.join("vendor").join("llama.cpp").join(plat).join(llama_exe);
+            if candidate.is_file() {
+                llama_bin = Some(candidate);
+                break;
+            }
+            dir = d.parent().map(|p| p.to_path_buf());
+        }
+    }
+
+    let mut cmd = Command::new(&node);
+    cmd.arg(&index_js)
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .current_dir(cwd);
+    if gguf.is_file() {
+        cmd.env("EMBED_GGUF", &gguf);
+    }
+    if let Some(bin) = &llama_bin {
+        cmd.env("LLAMACPP_BIN", bin);
+    }
+
+    eprintln!("[AuraMCP serve] starting node: {} {}", node, index_js.display());
+
+    match cmd.spawn() {
+        Ok(mut child) => {
+            let code = child.wait().ok().and_then(|s| s.code()).unwrap_or(1);
+            std::process::exit(code);
+        }
+        Err(e) => {
+            eprintln!("[AuraMCP serve] failed to spawn node: {e}");
+            std::process::exit(1);
+        }
+    }
+}
+
+// ---------- auto-registration in MCP clients ----------
+
+fn auto_register_mcp_clients() {
+    let exe = match std::env::current_exe() {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    let exe_str = exe.to_string_lossy().to_string();
+
+    if exe_str.contains("target") {
+        eprintln!("[AuraMCP] dev build, skipping MCP client auto-registration");
+        return;
+    }
+
+    let workspace = standalone_install_dir().join("Workspace");
+    let workspace_str = workspace.to_string_lossy().to_string();
+
+    let home = match std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")) {
+        Ok(h) => PathBuf::from(h),
+        Err(_) => return,
+    };
+
+    let entry = serde_json::json!({
+        "command": exe_str,
+        "args": ["--serve"],
+        "env": {
+            "AGENT_WORKSPACE": workspace_str
+        }
+    });
+
+    let lm_dir = home.join(".cache").join("lm-studio");
+    if !lm_dir.exists() {
+        return;
+    }
+
+    let mcp_json = lm_dir.join("mcp.json");
+    let mut config: serde_json::Value = std::fs::read_to_string(&mcp_json)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_else(|| serde_json::json!({"mcpServers": {}}));
+
+    if config.get("mcpServers").is_none() {
+        config["mcpServers"] = serde_json::json!({});
+    }
+    config["mcpServers"]["auramcp-server"] = entry.clone();
+
+    if let Ok(json) = serde_json::to_string_pretty(&config) {
+        let _ = std::fs::write(&mcp_json, &json);
+        eprintln!("[AuraMCP] registered in LM Studio: {}", mcp_json.display());
+    }
+
+    let plugin_bridge = lm_dir
+        .join("extensions")
+        .join("plugins")
+        .join("mcp")
+        .join("auramcp-server")
+        .join("mcp-bridge-config.json");
+    if plugin_bridge.parent().map(|p| p.exists()).unwrap_or(false) {
+        if let Ok(json) = serde_json::to_string_pretty(&entry) {
+            let _ = std::fs::write(&plugin_bridge, &json);
+            eprintln!("[AuraMCP] updated LM Studio bridge config");
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_command_entry)]
 pub fn run() {
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == "--serve") {
+        serve_stdio();
+    }
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -761,6 +1007,7 @@ pub fn run() {
         ])
         .setup(|app| {
             build_tray(app.handle())?;
+            auto_register_mcp_clients();
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 if let Err(e) = start_mcp_child(&handle) {

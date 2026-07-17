@@ -1,5 +1,26 @@
 # Release Notes
 
+## v3.4.2 (2026-07-17)
+
+**Zero-config: auto-registers in LM Studio, no manual JSON editing.**
+
+Adds a `--serve` mode so external MCP clients (LM Studio, Claude Desktop,
+etc.) can call `AuraMCP.exe --serve` directly. The exe resolves the bundled
+Node runtime and `dist/index.js` internally — no path guessing.
+
+On launch, the app auto-detects LM Studio (`~/.cache/lm-studio/`) and
+writes the correct config entry pointing to `AuraMCP.exe --serve`.
+
+Changes:
+- `serve_stdio()`: spawns bundled node with inherited stdin/stdout so
+  MCP JSON-RPC flows directly between client and server.
+- `auto_register_mcp_clients()`: updates LM Studio `mcp.json` and
+  per-plugin `mcp-bridge-config.json` on app startup.
+- UI "Wire into your MCP host": now shows `AuraMCP.exe --serve` as the
+  command, and the correct LM Studio config path
+  (`~/.cache/lm-studio/mcp.json`).
+- `get_install_paths` IPC now returns `exe_path`.
+
 ## v3.4.1 (2026-07-17)
 
 **Fix: MCP server died instantly on Start in the installed app.**
