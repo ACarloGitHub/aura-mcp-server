@@ -15,7 +15,7 @@ The server exposes 11 tools. Ten take an `action` parameter that selects the ope
 - `edit`: in-place find/replace (first occurrence). Fields: `path`, `search`, `replace`.
 - `list`: lists entries in a directory. Field: `path`.
 
-Returns `Sandbox: ...` with `isError: true` if `path` resolves outside `AGENT_WORKSPACE` and is not in `AURA_ALLOWED_PATHS`.
+Returns `Permission: ...` with `isError: true` and `pendingApproval: true` if `path` resolves outside `AGENT_WORKSPACE` and is not in the permission store. The agent should ask the user for permission, then use the `permissions` tool to grant access.
 
 ## exec
 
@@ -134,3 +134,18 @@ Requires either the `apiKey` argument, `ANYTHINGLLM_API_KEY` env var, or `api-ke
 ```
 
 Desktop notification with optional beep. Falls back through `node-notifier` → WinRT toast → System.Windows.Forms.NotifyIcon on Windows. Other platforms use stdout ASCII bell.
+
+## permissions
+
+```json
+{ "action": "grant|revoke|list|clear_session", "path": "...", "scope": "session|always", "tool": "file" }
+```
+
+Manage path permissions for file access outside `AGENT_WORKSPACE`.
+
+- `grant`: adds a path to the permission store. `scope=session` (in-memory, lost on restart) or `scope=always` (persisted in `allowed-paths.json`). `tool` defaults to `file`.
+- `revoke`: removes a path from both session and always stores.
+- `list`: lists all permissions (session + always). `structuredContent` carries `{ permissions: [...] }`.
+- `clear_session`: clears all session permissions.
+
+When a tool call targets a path outside `AGENT_WORKSPACE` and not in the permission store, the server returns a `pendingApproval` message instructing the agent to ask the user for permission and use this tool to grant access.

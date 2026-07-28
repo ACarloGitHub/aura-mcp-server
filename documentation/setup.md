@@ -269,9 +269,11 @@ workspace state.
   to the installed `AuraMCP.exe` and that `--serve` is in `args`.
 - **Unknown tool: \<name\>** — the host cached an old tool list. Close
   and reopen the MCP panel.
-- **Sandbox: Path outside AGENT_WORKSPACE** — the model tried to read
-  or write outside the workspace. Either fix the prompt or add the path
-  to `AURA_ALLOWED_PATHS`.
+- **Permission: Path outside AGENT_WORKSPACE** — the model tried to read
+  or write outside the workspace. The server returns a `pendingApproval`
+  message. The agent should ask the user for permission, then use the
+  `permissions` tool to grant access. Alternatively, add the path to
+  `AURA_ALLOWED_PATHS`.
 - **DuckDuckGo CAPTCHA** — rare; wait a few minutes before retrying.
 - **RAG fails: embedding backend not found** — open the system tray
   icon, choose "Restart". If the embedding model is missing, the

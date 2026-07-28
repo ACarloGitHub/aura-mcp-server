@@ -28,9 +28,9 @@ Wiki/
 
 Each multi-line result starts with `[INSTRUCTION: ...]` (phase 2 of v3.0). The instruction tells the model how to summarize — for `read` it's "reference or quote from it as needed; do NOT restate the whole page back to the user".
 
-## Sandbox
+## Permissions
 
-`wiki(read)`/`wiki(write)` validates the requested page path is inside `Wiki/` and outside `AURA_ALLOWED_PATHS` opt-in paths. Path traversal returns a `Sandbox: ...` error before the call hits disk.
+`wiki(read)`/`wiki(write)` validates the requested page path is inside `Wiki/` and against the permission store. Path traversal returns a `Permission: ...` error with `pendingApproval: true` before the call hits disk, instructing the agent to ask the user for permission.
 
 ## `wiki_ingest` actions
 

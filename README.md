@@ -35,7 +35,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that gives yo
 | 🔎 **RAG** | Semantic search via a native TypeScript engine (sqlite-vec) over sessions and auto-extracted entities. **No Python.** |
 | 💬 **AnythingLLM** | Export chat sessions directly from AnythingLLM API. |
 | 🔔 **Notifications** | Desktop notifications + beep when the agent completes tasks. |
-| 🛠️ **11 Built-in Tools** | `file`, `exec`, `exec_job`, `web_search`, `wiki`, `wiki_ingest`, `rag`, `planner`, `compact`, `anythingllm`, `notify`. |
+| 🛠️ **12 Built-in Tools** | `file`, `exec`, `exec_job`, `web_search`, `wiki`, `wiki_ingest`, `rag`, `planner`, `compact`, `anythingllm`, `notify`. |
 
 ## Requirements
 
@@ -184,6 +184,7 @@ writes `SOUL.md`, `MEMORY.md`, `USER.md`, `Wiki/`, `plans/` and
 | `compact` | Memory compaction + session archiving. |
 | `anythingllm` | Export chat sessions from AnythingLLM API. |
 | `notify` | Desktop notification + beep when tasks complete. |
+| `permissions` | Grant, revoke, or list path permissions for file access outside the workspace. |
 
 Per-tool schemas, action enums and body limits are documented in
 [`TOOLS.md`](TOOLS.md). All multi-line results start with a
@@ -235,7 +236,7 @@ aura-mcp-server/
 │   ├── index.ts                  # Server bootstrap + dispatch
 │   ├── tools/                    # 11 tool implementations
 │   ├── rag/                      # Native sqlite-vec RAG (no Python)
-│   └── utils/                    # Sandbox, truncation, helpers
+│   └── utils/                    # `Permissions, truncation, helpers`
 ├── documentation/                # User-facing docs (English)
 │   ├── setup.md
 │   ├── architecture.md

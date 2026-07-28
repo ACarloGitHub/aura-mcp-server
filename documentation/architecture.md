@@ -7,7 +7,7 @@ AuraMCP Server is a thin TypeScript process that speaks MCP over stdio. The host
 ```
 host (AnythingLLM / LM Studio)
   │  initialize
-  │  tools/list ─────────► TOOLS array (11 entries)
+  │  tools/list ─────────► TOOLS array (12 entries)
   │  tools/call ─────────► dispatcher ──► tool module ──► content + structuredContent
   │
   ▼
@@ -15,13 +15,13 @@ stdio (MCP SDK 1.29)
   │
 auramcp-server (Node.js, ESM)
   ├─ src/index.ts                # server + dispatch
-  ├─ src/utils/                  # helpers + sandbox + truncate + resultWrapper
-  └─ src/tools/                  # 11 tool implementations
+  ├─ src/utils/                  # helpers + permissions + truncate + resultWrapper
+  └─ src/tools/                  # 12 tool implementations
 ```
 
 ## Tool surface (v3.0)
 
-11 entries in `tools/list`. Each entry has `name`, `description` (≤ 120 chars), `inputSchema`. Entries that take `action` declare it as an enum.
+12 entries in `tools/list`. Each entry has `name`, `description` (≤ 120 chars), `inputSchema`. Entries that take `action` declare it as an enum.
 
 | # | Name | action enum | has `outputSchema` |
 |---|---|---|---|
@@ -36,6 +36,7 @@ auramcp-server (Node.js, ESM)
 | 9 | `compact` | `memory` \| `status` \| `list` | yes (status) |
 | 10 | `anythingllm` | `list` \| `export` \| `export-all` | no |
 | 11 | `notify` | — | no |
+| 12 | `permissions` | `grant` \| `revoke` \| `list` \| `clear_session` | no |
 
 The full action enum, parameter schema, and per-tool body limits live in `src/index.ts` and `src/utils/truncate.ts`.
 
@@ -61,10 +62,11 @@ src/
 │   │                     appendLogWithRotation (existing).
 │   ├── truncate.ts       LIMITS constants + truncate/truncateWithCount (new).
 │   ├── resultWrapper.ts  wrapWithInstruction(text, instruction) (new).
-│   ├── sandbox.ts        resolveAllowedPath, resolveAllowedPaths,
-│   │                     enabledCategories (new).
+│   ├── permissions.ts    resolveAllowedPath, resolveAllowedPaths,
+│   │                     enabledCategories, grantPermission,
+│   │                     revokePermission, listPermissions (new).
 │   ├── truncate.test.ts  Smoke tests for truncate.
-│   └── sandbox.test.ts   Smoke tests for sandbox.
+│   └── permissions.test.ts Smoke tests for permissions.
 └── tools/
     ├── file.ts             dispatch read|write|edit|list (new)
     ├── exec.ts             run|background + underlying impl (extended)
@@ -78,13 +80,14 @@ src/
     ├── compact.ts          memory|status|list (structuredContent for status)
     ├── anythingllm.ts      list|export|export-all
     ├── notify.ts           desktop notification
+    ├── permissions.ts      grant|revoke|list|clear_session (new)
     ├── read.ts / write.ts / edit.ts / list_dir.ts  thin targets for file()
     └── *.test.ts           node-runnable smoke tests
 ```
 
-## Sandbox + categories
+## Permissions + categories
 
-Before dispatch, `src/index.ts` calls `resolveAllowedPaths(args, [...path keys])` against `src/utils/sandbox.ts`. The check accepts paths inside `AGENT_WORKSPACE` and entries in `AURA_ALLOWED_PATHS`; everything else returns `isError: true`.
+Before dispatch, `src/index.ts` calls `resolveAllowedPaths(args, [...path keys])` against `src/utils/permissions.ts`. The check accepts paths inside `AGENT_WORKSPACE`, entries in `AURA_ALLOWED_PATHS`, and entries in the permission store (session or always). If a path is not allowed, the server returns a `pendingApproval` message instructing the agent to ask the user for permission and use the `permissions` tool to grant access.
 
 `src/index.ts` `main()` reads `AURA_ENABLED_CATEGORIES` once and filters `TOOLS` accordingly. No runtime reload — restart the server to change.
 
@@ -94,7 +97,7 @@ Before dispatch, `src/index.ts` calls `resolveAllowedPaths(args, [...path keys])
 host ──► CallToolRequest(name, args)
               │
               ▼
-        resolveAllowedPaths(args, path-keys)  ─── isError: true if outside WS
+        resolveAllowedPaths(args, path-keys)  ─── pendingApproval if outside WS
               │
               ▼
         switch (name)

@@ -14,14 +14,15 @@ AuraMCP Server reads all configuration from environment variables. They are read
 | `MCP_DISABLE_AUTONOTIFY` | unset | When `1`, suppresses the desktop auto-notification after every tool call. |
 | `MCP_LOG_MAX_MB` | `10` | Soft cap on the `mcp-server.log` file before rotation. |
 
-### Sandbox precedence
+### Permission precedence
 
 `file`/`wiki` paths must satisfy:
 
 1. Inside `AGENT_WORKSPACE` (resolved via `resolveWorkspacePath` in `src/utils/helpers.ts`).
-2. **OR** inside one of the entries of `AURA_ALLOWED_PATHS` (resolved via `resolveAllowedPath` in `src/utils/sandbox.ts`).
+2. **OR** inside one of the entries of `AURA_ALLOWED_PATHS` (resolved via `resolveAllowedPath` in `src/utils/permissions.ts`).
+3. **OR** inside the permission store (session scope: in-memory; always scope: persisted in `allowed-paths.json`).
 
-Otherwise the call returns `isError: true` with a `Sandbox: ...` message.
+Otherwise the call returns `isError: true` with a `Permission: ...` message and `pendingApproval: true`, instructing the agent to ask the user for permission.
 
 ## AnythingLLM
 

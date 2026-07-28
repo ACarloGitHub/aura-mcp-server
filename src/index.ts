@@ -18,8 +18,9 @@ import { plannerTool } from "./tools/planner.js";
 import { compactTool } from "./tools/compact.js";
 import { anythingllmTool } from "./tools/anythingllm.js";
 import { sendWinRTToast, notifyTool } from "./tools/notify.js";
+import { permissionsTool } from "./tools/permissions.js";
 import { appendLogWithRotation } from "./utils/helpers.js";
-import { resolveAllowedPaths, enabledCategories } from "./utils/sandbox.js";
+import { resolveAllowedPaths, enabledCategories } from "./utils/permissions.js";
 import { stopEmbeddingServer, registerShutdownHook } from "./rag/llamaserver.js";
 
 // ============================================================
@@ -258,6 +259,20 @@ let TOOLS: Tool[] = [
       required: ["message"],
     },
   },
+  {
+    name: "permissions",
+    description: "Manage path permissions for file access. Use for: granting, revoking, or listing allowed paths.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["grant", "revoke", "list", "clear_session"], description: "Which permissions action to perform" },
+        path: { type: "string", description: "Path to grant or revoke (required for grant/revoke)" },
+        scope: { type: "string", enum: ["session", "always"], description: "Permission scope (action=grant, default session)" },
+        tool: { type: "string", description: "Tool name the permission applies to (action=grant, default file)" },
+      },
+      required: ["action"],
+    },
+  },
 ];
 
 // ============================================================
@@ -369,20 +384,37 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   await appendLogWithRotation(logPath, logLine, maxLogMB);
 
   try {
-    const pathCheck = resolveAllowedPaths(args as any, [
-      "path",
-      "file_path",
-      "workspace",
-      "source",
-      "dir",
-      "directory",
-      "folder",
-    ]);
-    if (!pathCheck.ok) {
-      return {
-        content: [{ type: "text", text: `Sandbox: ${pathCheck.error}` }],
-        isError: true,
-      };
+    // Skip path check for tools that don't touch the filesystem
+    if (name !== "permissions" && name !== "notify" && name !== "web_search" && name !== "anythingllm") {
+      const pathCheck = resolveAllowedPaths(args as any, [
+        "path",
+        "file_path",
+        "workspace",
+        "source",
+        "dir",
+        "directory",
+        "folder",
+      ], name);
+      if (!pathCheck.ok) {
+        const err = pathCheck as any;
+        if (err.pendingApproval) {
+          return {
+            content: [{
+              type: "text",
+              text: `[INSTRUCTION: Ask the user if they want to allow access to this path. If they agree, use the permissions tool to grant access, then retry this call.]
+
+Permission required: ${err.path}
+
+The path is outside AGENT_WORKSPACE and not in the permission store. Ask the user to approve, then call the permissions tool with action=grant, path=<the path>, scope=session|always. After granting, retry this tool call.`,
+            }],
+            isError: true,
+          };
+        }
+        return {
+          content: [{ type: "text", text: `Permission: ${pathCheck.error}` }],
+          isError: true,
+        };
+      }
     }
 
     let result: any;
@@ -419,6 +451,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case "notify":
         result = await notifyTool(args as any);
+        break;
+      case "permissions":
+        result = await permissionsTool(args as any);
         break;
       default:
         throw new Error(`Unknown tool: ${name}`);
