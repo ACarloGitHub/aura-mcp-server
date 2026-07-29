@@ -60,14 +60,13 @@ async function wikiIngest(args: WikiIngestArgs): Promise<any> {
       type: "text",
       text: wrapWithInstruction(
         `Content of "${fileName}" loaded (${content.length} characters).\n\n` +
-        `Now you need to:\n` +
-        `1. Create a summary in wiki/summaries/${fileName}.md\n` +
-        `2. Identify concepts and create pages in wiki/concepts/\n` +
-        `3. Identify entities and create pages in wiki/entities/\n` +
-        `4. Add cross-links between pages\n` +
-        `5. Update wiki/index.md\n` +
-        `6. Update wiki/log.md\n\n` +
-        `The content is ready for your analysis.`,
+        `Now create wiki pages from this content:\n` +
+        `1. Write a summary via wiki(write) to summaries/${fileName}.md\n` +
+        `2. Identify concepts and entities, write pages in concepts/ and entities/\n` +
+        `3. Add [[cross-links]] between pages\n` +
+        `4. Then call wiki_ingest(action=update_index) to rebuild the index\n` +
+        `5. Then call wiki_ingest(action=update_log, source="ingested ${fileName}") to log\n\n` +
+        `Use wiki(search|read) afterward to query the curated knowledge.`,
         "Process the loaded content per the embedded instructions."
       ),
     }],

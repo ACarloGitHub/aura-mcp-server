@@ -178,7 +178,7 @@ writes `SOUL.md`, `MEMORY.md`, `USER.md`, `Wiki/`, `plans/` and
 | `exec_job` | Manage a background exec job (poll, kill, list, clean). |
 | `web_search` | Web search via DuckDuckGo. |
 | `wiki` | Manage the local wiki (search, read, write, list). |
-| `wiki_ingest` | Advanced wiki ingest, lint, index updates. |
+| `wiki_ingest` | Curate a structured Karpathy-style wiki: ingest raw files, query the index, lint integrity, update index and log. |
 | `rag` | Semantic search using a native sqlite-vec engine + `nomic-embed-text-v2-moe`. |
 | `planner` | Create and execute phased plans with blocking questions. |
 | `compact` | Memory compaction + session archiving. |
@@ -190,6 +190,19 @@ Per-tool schemas, action enums and body limits are documented in
 [`TOOLS.md`](TOOLS.md). All multi-line results start with a
 `[INSTRUCTION: ...]` prefix telling the model how to summarise for the
 user.
+
+### wiki_ingest
+
+Curates a structured Karpathy-style knowledge graph under `Wiki/`. Actions: `ingest`, `query`, `lint`, `update_index`, `update_log`.
+
+Workflow:
+1. Place a source file in `Wiki/raw/`
+2. Call `wiki_ingest(action="ingest", source="...")` — the response tells the model what wiki pages to write
+3. Call `wiki_ingest(action="update_index")` to rebuild `Wiki/wiki/index.md`
+4. Call `wiki_ingest(action="update_log", source="ingested <name>")` to log the operation
+5. Use `wiki(search|read)` to query the curated knowledge
+
+See [documentation/wiki.md](documentation/wiki.md) for the full layout and details.
 
 ## Environment Variables
 

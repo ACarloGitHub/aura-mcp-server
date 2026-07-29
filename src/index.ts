@@ -142,12 +142,12 @@ let TOOLS: Tool[] = [
   },
   {
     name: "wiki_ingest",
-    description: "Advanced wiki ingest, query, lint, and index updates. Use for: knowledge-graph curation.",
+    description: "Curate a structured Karpathy-style wiki: ingest raw files, query the index, lint integrity, update index and log.",
     inputSchema: {
       type: "object",
       properties: {
-        action: { type: "string", enum: ["ingest", "query", "lint", "update_index", "update_log"], description: "Which ingest action to perform" },
-        source: { type: "string", description: "Path of the raw file (action=ingest) or operation description (action=update_log)" },
+        action: { type: "string", enum: ["ingest", "query", "lint", "update_index", "update_log"], description: "ingest: load raw file from Wiki/raw/ and return content with instructions. query: surface index for a query. lint: check frontmatter, orphans, confidence. update_index: rebuild Wiki/wiki/index.md. update_log: append to Wiki/wiki/log.md." },
+        source: { type: "string", description: "Path under Wiki/raw/ (action=ingest) or operation description (action=update_log)" },
         query_text: { type: "string", description: "Query text (action=query)" },
       },
       required: ["action"],
