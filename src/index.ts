@@ -16,7 +16,7 @@ import { ragTool } from "./tools/rag.js";
 import { wikiIngestTool } from "./tools/wiki_ingest.js";
 import { plannerTool } from "./tools/planner.js";
 import { compactTool } from "./tools/compact.js";
-import { anythingllmTool } from "./tools/anythingllm.js";
+import { anythingllmChatExporterTool } from "./tools/anythingllm.js";
 import { sendWinRTToast, notifyTool } from "./tools/notify.js";
 import { permissionsTool } from "./tools/permissions.js";
 import { appendLogWithRotation } from "./utils/helpers.js";
@@ -142,11 +142,11 @@ let TOOLS: Tool[] = [
   },
   {
     name: "wiki_ingest",
-    description: "Curate a structured Karpathy-style wiki: ingest raw files, query the index, lint integrity, update index and log.",
+    description: "Curate the structured wiki: ingest raw files, fix the curated wiki into the RAG, query the index, lint integrity, update index and log.",
     inputSchema: {
       type: "object",
       properties: {
-        action: { type: "string", enum: ["ingest", "query", "lint", "update_index", "update_log"], description: "ingest: load raw file from Wiki/raw/ and return content with instructions. query: surface index for a query. lint: check frontmatter, orphans, confidence. update_index: rebuild Wiki/wiki/index.md. update_log: append to Wiki/wiki/log.md." },
+        action: { type: "string", enum: ["ingest", "ingest_wiki", "query", "lint", "update_index", "update_log"], description: "ingest: load raw file from Wiki/raw/ and return content with instructions. ingest_wiki: index the curated wiki pages into the RAG 'wiki' collection (upsert by path; excludes raw/, test/, ritest/, index.md, log.md). query: surface index for a query. lint: check frontmatter, orphans, confidence. update_index: rebuild Wiki/wiki/index.md. update_log: append to Wiki/wiki/log.md." },
         source: { type: "string", description: "Path under Wiki/raw/ (action=ingest) or operation description (action=update_log)" },
         query_text: { type: "string", description: "Query text (action=query)" },
       },
@@ -155,11 +155,11 @@ let TOOLS: Tool[] = [
   },
   {
     name: "rag",
-    description: "Semantic search and document management over a native sqlite-vec index. Use for: context by meaning.",
+    description: "Semantic search and document management over a native sqlite-vec index. Use for: context by meaning. Chat capture is per client: ingest_sessions is LM Studio only (reads .conversation.json from disk); ingest_anythingllm is AnythingLLM only (reads chats via the AnythingLLM API).",
     inputSchema: {
       type: "object",
       properties: {
-        action: { type: "string", enum: ["search", "add", "list", "delete", "collections", "ingest_sessions"], description: "Which RAG action to perform" },
+        action: { type: "string", enum: ["search", "add", "list", "delete", "collections", "ingest_sessions", "ingest_anythingllm"], description: "Which RAG action to perform" },
         collection: { type: "string", description: "Collection name (search/add/list/delete)" },
         query: { type: "string", description: "Semantic query (action=search)" },
         id: { type: "string", description: "Document ID (action=add/delete)" },
@@ -167,8 +167,10 @@ let TOOLS: Tool[] = [
         metadata: { type: "string", description: "JSON metadata string (action=add, optional)" },
         limit: { type: "number", description: "Max results (action=search default 5, list default 50)" },
         filter: { type: "string", description: "JSON metadata filter (action=search, optional)" },
-        folder: { type: "string", description: "Specific session folder (action=ingest_sessions, optional)" },
+        folder: { type: "string", description: "Specific LM Studio session folder (action=ingest_sessions, optional)" },
         reindex: { type: "boolean", description: "Re-index from scratch (action=ingest_sessions)" },
+        workspace: { type: "string", description: "AnythingLLM workspace slug (action=ingest_anythingllm, optional; default all)" },
+        thread: { type: "string", description: "AnythingLLM thread slug (action=ingest_anythingllm, optional)" },
       },
       required: ["action"],
     },
@@ -189,12 +191,16 @@ let TOOLS: Tool[] = [
   },
   {
     name: "compact",
-    description: "Compact or inspect MEMORY.md and compacted sessions. Use for: bounding long-term notes.",
+    description: "Bound long-term notes and sessions. memory/status/list manage MEMORY.md and compacted-sessions/. session is LM Studio only: compacts an LM Studio chat into a new chat file (summary + first message + last exchanges, summary only above 50% of context).",
     inputSchema: {
       type: "object",
       properties: {
-        action: { type: "string", enum: ["memory", "status", "list"], description: "Which compact action to perform" },
+        action: { type: "string", enum: ["memory", "status", "list", "session"], description: "Which compact action to perform" },
         threshold: { type: "number", description: "Line threshold (action=memory, default 300)" },
+        title: { type: "string", description: "Title of the LM Studio chat to compact (action=session, required)" },
+        contextLength: { type: "number", description: "Context length in tokens (action=session, optional; otherwise read from the chat file, AURA_COMPACT_CONTEXT_LENGTH, or 8192)" },
+        model: { type: "string", description: "Model id for the summary (action=session, optional; default AURA_LLM_MODEL or the chat's lastUsedModel)" },
+        keepExchanges: { type: "number", description: "Recent user exchanges kept verbatim (action=session, default 2)" },
       },
       required: ["action"],
     },
@@ -233,12 +239,12 @@ let TOOLS: Tool[] = [
     },
   },
   {
-    name: "anythingllm",
-    description: "List or export AnythingLLM workspaces. Use for: capturing chat history.",
+    name: "anythingllm_chat_exporter",
+    description: "AnythingLLM only: list or export chats from a running AnythingLLM instance via its REST API (default http://localhost:3001/api/v1). Use for: capturing AnythingLLM chat history. On AnythingLLM, call this before rag(action=ingest_anythingllm) to store chats in the RAG.",
     inputSchema: {
       type: "object",
       properties: {
-        action: { type: "string", enum: ["list", "export", "export-all"], description: "Which anythingllm action to perform" },
+        action: { type: "string", enum: ["list", "export", "export-all"], description: "Which anythingllm_chat_exporter action to perform" },
         workspace: { type: "string", description: "Workspace slug (action=export)" },
         thread: { type: "string", description: "Thread slug (action=export, optional)" },
         apiKey: { type: "string", description: "API key (optional, uses ANYTHINGLLM_API_KEY env var)" },
@@ -307,7 +313,7 @@ async function isAnythingLLMForeground(): Promise<boolean> {
     const { stdout } = await execFileAsync(
       "powershell",
       ["-NoProfile", "-EncodedCommand", encoded],
-      { encoding: "utf-8", timeout: 4000 }
+      { encoding: "utf-8", timeout: 4000, windowsHide: true }
     );
     return stdout.trim().toLowerCase().includes("anythingllm");
   } catch {
@@ -357,12 +363,21 @@ function autoNotify(name: string, rawResult: any): void {
 const server = new Server(
   {
     name: "auramcp-server",
-    version: "3.1.0",
+    version: "3.5.1",
   },
   {
     capabilities: {
       tools: {},
     },
+    instructions: [
+      "AuraMCP exposes domain tools with an action parameter.",
+      "Chat capture is client-specific:",
+      "- LM Studio only: compact(action=session) compacts a chat into a new chat file; rag(action=ingest_sessions) indexes conversations from disk.",
+      "- AnythingLLM only: anythingllm_chat_exporter(action=export|export-all) fetches chats via the AnythingLLM API; rag(action=ingest_anythingllm) exports and indexes them into the RAG 'sessions' collection.",
+      "On AnythingLLM, to store chats into the RAG, call anythingllm_chat_exporter first, then rag(action=ingest_anythingllm).",
+      "wiki_ingest(action=ingest_wiki) fixes the curated wiki pages into the RAG 'wiki' collection (upsert by path; excludes raw/).",
+      "RAG is a generic semantic store (collections: sessions, wiki, ...). Use rag(action=search) for recall by meaning.",
+    ].join("\n"),
   }
 );
 
@@ -385,7 +400,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   try {
     // Skip path check for tools that don't touch the filesystem
-    if (name !== "permissions" && name !== "notify" && name !== "web_search" && name !== "anythingllm") {
+    if (name !== "permissions" && name !== "notify" && name !== "web_search" && name !== "anythingllm_chat_exporter") {
       const pathCheck = resolveAllowedPaths(args as any, [
         "path",
         "file_path",
@@ -446,8 +461,8 @@ The path is outside AGENT_WORKSPACE and not in the permission store. Ask the use
       case "compact":
         result = await compactTool(args as any);
         break;
-      case "anythingllm":
-        result = await anythingllmTool(args as any);
+      case "anythingllm_chat_exporter":
+        result = await anythingllmChatExporterTool(args as any);
         break;
       case "notify":
         result = await notifyTool(args as any);

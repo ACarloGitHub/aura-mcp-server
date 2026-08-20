@@ -2,9 +2,10 @@ import { readFile, writeFile, mkdir, readdir, appendFile, stat } from "fs/promis
 import { join, dirname, basename, resolve } from "path";
 import { getWorkspaceRoot, formatError } from "../utils/helpers.js";
 import { wrapWithInstruction } from "../utils/resultWrapper.js";
+import { ragAdd } from "../rag/index.js";
 
 interface WikiIngestArgs {
-  action: "ingest" | "query" | "lint" | "update_index" | "update_log";
+  action: "ingest" | "query" | "lint" | "update_index" | "update_log" | "ingest_wiki";
   source?: string;
   query_text?: string;
 }
@@ -16,6 +17,9 @@ function getWikiRoot(): string {
 const LOG_PATH = () => join(getWikiRoot(), "wiki", "log.md");
 const INDEX_PATH = () => join(getWikiRoot(), "wiki", "index.md");
 const TODAY = new Date().toISOString().split("T")[0];
+
+const INGEST_WIKI_SKIP_DIRS = new Set(["raw", "test", "ritest"]);
+const INGEST_WIKI_SKIP_FILES = new Set(["index.md", "log.md"]);
 
 export async function wikiIngestTool(args: WikiIngestArgs): Promise<any> {
   try {
@@ -30,6 +34,8 @@ export async function wikiIngestTool(args: WikiIngestArgs): Promise<any> {
         return await wikiUpdateIndex();
       case "update_log":
         return await wikiUpdateLog(args);
+      case "ingest_wiki":
+        return await wikiIngestToRag();
       default:
         throw new Error(`Unknown wiki_ingest action: ${args.action}`);
     }
@@ -310,4 +316,93 @@ async function scanProjectPages(
   } catch {
     // skip
   }
+}
+
+interface WikiPageForRag {
+  rel: string;
+  content: string;
+  title: string;
+  type: string;
+}
+
+async function collectWikiPages(dir: string, base: string, pages: WikiPageForRag[]): Promise<void> {
+  try {
+    const entries = await readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.name.startsWith(".")) continue;
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (INGEST_WIKI_SKIP_DIRS.has(entry.name)) continue;
+        await collectWikiPages(fullPath, base, pages);
+      } else if (entry.name.endsWith(".md") && !INGEST_WIKI_SKIP_FILES.has(entry.name)) {
+        try {
+          const content = await readFile(fullPath, "utf-8");
+          const rel = fullPath.replace(base, "").replace(/^[\\/]/, "").replace(/\\/g, "/");
+          pages.push({
+            rel,
+            content,
+            title: extractTitle(content) || entry.name.replace(".md", ""),
+            type: wikiPageType(rel),
+          });
+        } catch {
+          // skip
+        }
+      }
+    }
+  } catch {
+    // skip
+  }
+}
+
+function wikiPageType(rel: string): string {
+  const parts = rel.split("/");
+  if (parts.length === 1) {
+    return parts[0].replace(".md", "") === "agent_rules" ? "rule" : "page";
+  }
+  return singularType(parts[0]);
+}
+
+async function wikiIngestToRag(): Promise<any> {
+  const wikiRoot = getWikiRoot();
+  const pages: WikiPageForRag[] = [];
+  await collectWikiPages(wikiRoot, wikiRoot, pages);
+
+  let indexed = 0;
+  const errors: string[] = [];
+  for (const page of pages) {
+    try {
+      await ragAdd({
+        collection: "wiki",
+        id: page.rel,
+        text: page.content,
+        metadata: {
+          type: page.type,
+          title: page.title.slice(0, 200),
+          source: "wiki",
+        },
+      });
+      indexed++;
+    } catch (e) {
+      errors.push(`${page.rel}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  const lines = [
+    `Wiki pages indexed into RAG collection "wiki": ${indexed}`,
+    `Excluded: raw/, test/, ritest/, index.md, log.md (not indexed).`,
+  ];
+  if (errors.length) {
+    lines.push(`Errors (${errors.length}):`);
+    lines.push(...errors.slice(0, 10).map((e) => `  - ${e}`));
+  }
+
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        lines.join("\n"),
+        "Briefly summarize the ingest result. This fixes the current curated wiki pages into the RAG 'wiki' collection; re-running updates in place (upsert by id)."
+      ),
+    }],
+  };
 }

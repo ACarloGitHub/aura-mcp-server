@@ -1,11 +1,12 @@
 import { ragSearch, ragAdd, ragList, ragDelete, ragCollections } from "../rag/index.js";
 import { ingestSessions } from "../rag/sessions.js";
+import { anythingllmIngestSessions } from "./anythingllm.js";
 import { formatError } from "../utils/helpers.js";
 import { LIMITS } from "../utils/truncate.js";
 import { wrapWithInstruction, truncateSnippet } from "../utils/resultWrapper.js";
 
 interface RagArgs {
-  action: "search" | "add" | "list" | "delete" | "collections" | "ingest_sessions";
+  action: "search" | "add" | "list" | "delete" | "collections" | "ingest_sessions" | "ingest_anythingllm";
   collection?: string;
   query?: string;
   id?: string;
@@ -15,6 +16,8 @@ interface RagArgs {
   filter?: string;
   folder?: string;
   reindex?: boolean;
+  workspace?: string;
+  thread?: string;
 }
 
 export async function ragTool(args: RagArgs): Promise<any> {
@@ -32,6 +35,8 @@ export async function ragTool(args: RagArgs): Promise<any> {
         return await doCollections();
       case "ingest_sessions":
         return await doIngest(args);
+      case "ingest_anythingllm":
+        return await doIngestAnythingLLM(args);
       default:
         throw new Error(`Unknown RAG action: ${args.action}`);
     }
@@ -215,6 +220,36 @@ async function doIngest(args: RagArgs): Promise<any> {
         text: wrapWithInstruction(
           lines.join("\n"),
           "Briefly describe what was indexed. If there are errors, surface the first one."
+        ),
+      },
+    ],
+  };
+}
+
+async function doIngestAnythingLLM(args: RagArgs): Promise<any> {
+  const result = await anythingllmIngestSessions({
+    workspace: args.workspace,
+    thread: args.thread,
+  });
+
+  const lines = [
+    `AnythingLLM chats found: ${result.found}`,
+    `Markdown exported: ${result.exported}`,
+    `Indexed into RAG (collection "sessions"): ${result.indexed}`,
+    `Export dir: ${result.exportDir}`,
+  ];
+  if (result.errors.length) {
+    lines.push(`Errors (${result.errors.length}):`);
+    lines.push(...result.errors.slice(0, 10).map((e) => `  - ${e}`));
+  }
+
+  return {
+    content: [
+      {
+        type: "text",
+        text: wrapWithInstruction(
+          lines.join("\n"),
+          "Briefly describe what was indexed. AnythingLLM only: this action reads chats via the AnythingLLM API. If there are errors, surface the first one."
         ),
       },
     ],

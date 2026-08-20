@@ -21,6 +21,7 @@ function playBeep(): void {
       execSync("powershell -NoProfile -Command \"[console]::beep(800,200)\"", {
         stdio: "ignore",
         timeout: 3000,
+        windowsHide: true,
       });
     } else {
       process.stdout.write("\x07");
@@ -66,6 +67,7 @@ $toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
     execSync(`powershell -NoProfile -EncodedCommand ${encoded}`, {
       stdio: "ignore",
       timeout: 10000,
+      windowsHide: true,
     });
     return true;
   } catch {
@@ -108,7 +110,7 @@ export async function notifyTool(args: NotifyArgs): Promise<any> {
           `$balloon.BalloonTipText = '${message.replace(/'/g, "''")}'; ` +
           `$balloon.Visible = $true; ` +
           `$balloon.ShowBalloonTip(5000)"`,
-          { stdio: "ignore", timeout: 5000 }
+          { stdio: "ignore", timeout: 5000, windowsHide: true }
         );
         notificationSent = true;
       } catch {

@@ -3,6 +3,7 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { getWorkspaceRoot, formatError } from "../utils/helpers.js";
 import { wrapWithInstruction } from "../utils/resultWrapper.js";
+import { ragAdd } from "../rag/index.js";
 
 const WORKSPACE = getWorkspaceRoot();
 const SESSIONS_DIR = join(WORKSPACE, "AnythingLLMSessions");
@@ -12,7 +13,7 @@ const API_BASE = process.env.ANYTHINGLLM_BASE_URL || "http://localhost:3001/api/
 // @ts-ignore — import.meta.url valido in ESM Node16
 const _serverDir = dirname(dirname(fileURLToPath(import.meta.url)));
 
-async function getApiKey(argsKey?: string): Promise<string> {
+export async function getApiKey(argsKey?: string): Promise<string> {
   // 1. Direct parameter in tool call
   if (argsKey) return argsKey;
 
@@ -74,7 +75,7 @@ interface ChatMessage {
   feedbackScore?: any;
 }
 
-export async function anythingllmTool(args: AnythingLLMArgs): Promise<any> {
+export async function anythingllmChatExporterTool(args: AnythingLLMArgs): Promise<any> {
   try {
     const key = await getApiKey(args.apiKey);
 
@@ -86,7 +87,7 @@ export async function anythingllmTool(args: AnythingLLMArgs): Promise<any> {
       case "export-all":
         return await exportAll(key);
       default:
-        throw new Error(`Unknown anythingllm action: ${args.action}`);
+        throw new Error(`Unknown anythingllm_chat_exporter action: ${args.action}`);
     }
   } catch (error) {
     return formatError(error);
@@ -342,4 +343,100 @@ function buildChatBody(messages: ChatMessage[]): string {
 
   md += `---\n\n_Exported via AnythingLLM API_\n`;
   return md;
+}
+
+export interface AnythingLLMIngestResult {
+  found: number;
+  exported: number;
+  indexed: number;
+  errors: string[];
+  exportDir: string;
+}
+
+export async function anythingllmIngestSessions(params: {
+  workspace?: string;
+  thread?: string;
+}): Promise<AnythingLLMIngestResult> {
+  const key = await getApiKey();
+  const result: AnythingLLMIngestResult = {
+    found: 0,
+    exported: 0,
+    indexed: 0,
+    errors: [],
+    exportDir: SESSIONS_DIR,
+  };
+  await mkdir(SESSIONS_DIR, { recursive: true });
+
+  const workspaces = await withApiTimeout(fetchWorkspaces(key), "listWorkspaces");
+  const targets = params.workspace
+    ? workspaces.filter((w) => w.slug === params.workspace)
+    : workspaces;
+  if (params.workspace && targets.length === 0) {
+    throw new Error(`Workspace not found: ${params.workspace}`);
+  }
+
+  const ingestOne = async (ws: Workspace, threadSlug?: string) => {
+    let messages: ChatMessage[];
+    try {
+      messages = await withApiTimeout(fetchChats(key, ws.slug, threadSlug), "fetchChats");
+    } catch (e) {
+      result.errors.push(`${ws.slug}${threadSlug ? `/${threadSlug}` : ""}: ${e instanceof Error ? e.message : String(e)}`);
+      return;
+    }
+    if (messages.length === 0) return;
+    result.found += messages.length;
+
+    const ts = new Date().toISOString().split("T")[0];
+    const safe = ws.slug.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const tSafe = threadSlug ? `_thread_${threadSlug.replace(/[^a-zA-Z0-9_-]/g, "_")}` : "";
+    const filename = `${ts}_AnythingLLM_${safe}${tSafe}.md`;
+    const filepath = join(SESSIONS_DIR, filename);
+
+    try {
+      let md = buildFrontmatter(ws.slug, messages.length, threadSlug);
+      md += `# AnythingLLM — ${ws.name}${threadSlug ? `\n\nThread: ${threadSlug}` : ""}\n\n`;
+      md += buildChatBody(messages);
+      await writeFile(filepath, md, "utf-8");
+      result.exported++;
+    } catch (e) {
+      result.errors.push(`export ${filename}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    try {
+      const text = messages
+        .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+        .join("\n\n");
+      const docId = `anythingllm-${ws.slug}${threadSlug ? `-${threadSlug}` : "-main"}`;
+      await ragAdd({
+        collection: "sessions",
+        id: docId,
+        text,
+        metadata: {
+          source: "anythingllm",
+          workspace: ws.slug,
+          thread: threadSlug ?? "main",
+          messages: String(messages.length),
+          date: ts,
+        },
+      });
+      result.indexed++;
+    } catch (e) {
+      result.errors.push(`index ${ws.slug}${threadSlug ? `/${threadSlug}` : ""}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
+  for (const ws of targets) {
+    if (params.thread) {
+      await ingestOne(ws, params.thread);
+    } else {
+      await ingestOne(ws, undefined);
+      if (ws.threads && ws.threads.length > 0) {
+        for (const t of ws.threads) {
+          await ingestOne(ws, t.slug);
+        }
+      }
+    }
+  }
+
+  return result;
 }

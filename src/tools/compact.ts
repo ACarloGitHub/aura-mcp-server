@@ -1,11 +1,19 @@
 import { readFile, writeFile, readdir, mkdir, appendFile } from "fs/promises";
-import { join, resolve, dirname } from "path";
+import { join, resolve, dirname, basename } from "path";
 import { getWorkspaceRoot, textResult, formatError } from "../utils/helpers.js";
 import { wrapWithInstruction } from "../utils/resultWrapper.js";
+import { findConversationByTitle } from "../rag/lmstudio.js";
+import { estimateTokens, summarizeTranscript, llmModel } from "../utils/localLlm.js";
 
 interface CompactArgs {
-  action: "memory" | "status" | "list";
+  action: "memory" | "status" | "list" | "session";
   threshold?: number;
+  title?: string;
+  contextLength?: number;
+  model?: string;
+  keepExchanges?: number;
+  chunkTokens?: number;
+  maxOutputTokens?: number;
 }
 
 function getWorkspace(): string {
@@ -14,6 +22,7 @@ function getWorkspace(): string {
 
 const COMPACTED_DIR = () => join(getWorkspace(), "compacted-sessions");
 const MEMORY_THRESHOLD_DEFAULT = 300;
+const CONTEXT_LENGTH_DEFAULT = 8192;
 
 export async function compactTool(args: CompactArgs): Promise<any> {
   try {
@@ -24,6 +33,8 @@ export async function compactTool(args: CompactArgs): Promise<any> {
         return await compactStatus(args);
       case "list":
         return await listCompacted();
+      case "session":
+        return await compactSession(args);
       default:
         throw new Error(`Unknown compact action: ${args.action}`);
     }
@@ -200,4 +211,175 @@ async function listCompacted(): Promise<any> {
       }],
     };
   }
+}
+
+function getContextLength(raw: any, override?: number): number {
+  if (override && override > 0) return Math.floor(override);
+  const env = Number(process.env.AURA_COMPACT_CONTEXT_LENGTH);
+  if (env && env > 0) return Math.floor(env);
+  const fields: unknown[] = raw?.lastUsedModel?.instanceLoadTimeConfig?.fields ?? [];
+  for (const f of fields) {
+    if (f && typeof f === "object") {
+      const k = (f as any).key;
+      const v = (f as any).value;
+      if (typeof k === "string" && k.includes("contextLength")) {
+        const n = typeof v === "number" ? v : Number(String(v));
+        if (n && n > 0) return Math.floor(n);
+      }
+    } else {
+      const m = String(f).match(/llm\.load\.contextLength[^0-9]*(\d+)/);
+      if (m) return Number(m[1]);
+    }
+  }
+  return CONTEXT_LENGTH_DEFAULT;
+}
+
+function rawRole(rawMsg: any): string {
+  const versions: any[] = Array.isArray(rawMsg?.versions) ? rawMsg.versions : [];
+  if (versions.length === 0) return "unknown";
+  const v = versions[versions.length - 1];
+  return typeof v?.role === "string" ? v.role : typeof v?.type === "string" ? v.type : "unknown";
+}
+
+function rawMessageText(rawMsg: any): string {
+  const versions: any[] = Array.isArray(rawMsg?.versions) ? rawMsg.versions : [];
+  if (versions.length === 0) return "";
+  const v = versions[versions.length - 1];
+  const content = v?.content;
+  const parts: string[] = [];
+  if (Array.isArray(content)) {
+    for (const c of content) {
+      if (typeof c === "string") parts.push(c);
+      else if (c && typeof c === "object" && typeof c.text === "string") parts.push(c.text);
+    }
+  } else if (typeof content === "string") {
+    parts.push(content);
+  }
+  return parts.join(" ");
+}
+
+async function compactSession(args: CompactArgs): Promise<any> {
+  if (!args.title) {
+    throw new Error(
+      "Required parameter: title (the title of the LM Studio chat to compact). " +
+      "LM Studio only: this action reads the chat file on disk."
+    );
+  }
+
+  const found = await findConversationByTitle(args.title);
+  if (!found) {
+    throw new Error(
+      `No LM Studio conversation found with title "${args.title}". ` +
+      "This is an LM Studio-only feature: the chat must exist in the LM Studio " +
+      "conversations directory (LM_STUDIO_CONVERSATIONS_DIR or ~/.cache/lm-studio/conversations)."
+    );
+  }
+  const { filepath, conv } = found;
+  if (!conv.messages || conv.messages.length === 0) {
+    return {
+      content: [{
+        type: "text",
+        text: wrapWithInstruction(
+          `Chat "${conv.name}" has no messages to compact.`,
+          "Acknowledge that the chat is empty."
+        ),
+      }],
+    };
+  }
+
+  const raw = JSON.parse(await readFile(filepath, "utf-8"));
+  const contextLength = getContextLength(raw, args.contextLength);
+  const halfContext = Math.floor(contextLength / 2);
+
+  const model = args.model || llmModel() || (conv.model && conv.model !== "unknown" ? conv.model : undefined);
+  if (!model) {
+    throw new Error(
+      "No model available for summarization. Set AURA_LLM_MODEL (and AURA_LLM_URL if not " +
+      "http://localhost:1234/v1/chat/completions), or use a conversation that records a lastUsedModel."
+    );
+  }
+
+  const transcript = conv.messages
+    .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+    .join("\n\n");
+
+  const summary = await summarizeTranscript({
+    transcript,
+    model,
+    chunkTokens: args.chunkTokens,
+    maxOutputTokens: args.maxOutputTokens,
+  });
+
+  const baseSystem = conv.system_prompt ? `${conv.system_prompt.trim()}\n\n` : "";
+  const newSystemPrompt = `${baseSystem}[Riepilogo della conversazione precedente]\n${summary}`;
+
+  const userIdx: number[] = [];
+  raw.messages.forEach((m: any, i: number) => {
+    if (rawRole(m) === "user") userIdx.push(i);
+  });
+  const keepExchanges = Math.max(1, Math.min(args.keepExchanges ?? 2, 10));
+  const firstUser = userIdx[0];
+  const startTail = userIdx.length > 0 ? userIdx[Math.max(0, userIdx.length - keepExchanges)] : 0;
+
+  const keptIndices = new Set<number>();
+  if (firstUser !== undefined) keptIndices.add(firstUser);
+  for (let i = startTail; i < (raw.messages?.length ?? 0); i++) keptIndices.add(i);
+
+  const keptMessages = (raw.messages as any[]).filter((_, i) => keptIndices.has(i));
+  const keptText = keptMessages.map(rawMessageText).join("\n");
+  const estimated = estimateTokens(newSystemPrompt) + estimateTokens(keptText);
+
+  const summaryOnly = estimated > halfContext;
+  const finalMessages = summaryOnly ? [] : keptMessages;
+
+  const newTimestamp = Date.now();
+  const newRaw = JSON.parse(JSON.stringify(raw));
+  newRaw.name = `${conv.name} -compacted`;
+  newRaw.createdAt = newTimestamp;
+  newRaw.messages = finalMessages;
+  newRaw.systemPrompt = newSystemPrompt;
+  if (typeof newRaw.tokenCount === "number") newRaw.tokenCount = 0;
+  if (typeof newRaw.userFilesSizeBytes === "number") newRaw.userFilesSizeBytes = 0;
+
+  const newFile = join(dirname(filepath), `${newTimestamp}.conversation.json`);
+  await writeFile(newFile, JSON.stringify(newRaw, null, 2), "utf-8");
+
+  await mkdir(COMPACTED_DIR(), { recursive: true });
+  const safeName = (conv.name || "session").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "_") || "session";
+  const dateTag = new Date().toISOString().split("T")[0];
+  const seedPath = join(COMPACTED_DIR(), `${safeName}-${dateTag}.seed.md`);
+  const seedContent = [
+    `# Seed — ${conv.name}`,
+    ``,
+    `- Compattata da: ${basename(filepath)}`,
+    `- Nuova chat: ${basename(newFile)}`,
+    `- Data: ${dateTag}`,
+    `- Modalità: ${summaryOnly ? "solo riassunto (sopra il 50% del contesto)" : "riassunto + primi/ultimi messaggi"}`,
+    ``,
+    `## Riepilogo`,
+    ``,
+    summary,
+    ``,
+  ].join("\n");
+  await writeFile(seedPath, seedContent, "utf-8");
+
+  return {
+    content: [{
+      type: "text",
+      text: wrapWithInstruction(
+        [
+          `Session compacted (LM Studio only).`,
+          ``,
+          `Chat: ${conv.name}`,
+          `Context: ${contextLength} tokens (half: ${halfContext})`,
+          `Estimated compacted: ~${estimated} tokens${summaryOnly ? " → over budget, kept summary only" : ""}`,
+          `New chat file: ${newFile}`,
+          `Seed file: ${seedPath}`,
+          ``,
+          `The original conversation was NOT modified. Tell the user to open the new chat "${conv.name} -compacted" in LM Studio to continue with less context.`,
+        ].join("\n"),
+        "Confirm the compaction result: the new chat file, the seed file, and that the original was left untouched."
+      ),
+    }],
+  };
 }

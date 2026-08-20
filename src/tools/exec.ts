@@ -44,6 +44,7 @@ export async function execTool(args: ExecArgs): Promise<any> {
     cwd: workdir || process.cwd(),
     env: env ? { ...process.env, ...env } : process.env,
     stdio: ["pipe", "pipe", "pipe"],
+    windowsHide: true,
   };
 
   if (background) {
