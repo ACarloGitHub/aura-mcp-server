@@ -895,6 +895,7 @@ fn serve_stdio() -> ! {
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .current_dir(cwd);
+    no_window(&mut cmd);
     if gguf.is_file() {
         cmd.env("EMBED_GGUF", &gguf);
     }

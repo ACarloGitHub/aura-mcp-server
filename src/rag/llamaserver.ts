@@ -61,6 +61,7 @@ async function startServer(): Promise<void> {
     "--n-gpu-layers", "0",
     "--ctx-size", "8192",
     "--parallel", "1",
+    "--batch-size", "2048",
   ];
 
   const spawned = spawn(binary, args, {

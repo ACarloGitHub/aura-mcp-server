@@ -129,16 +129,8 @@ async function wikiLint(): Promise<any> {
       const content = await readFile(pagePath, "utf-8");
       const relativePath = pagePath.replace(wikiRoot, "").replace(/^[\\\/]/, "");
 
-      if (!content.startsWith("---")) {
-        issues.push(`MISSING FRONTMATTER: ${relativePath}`);
-      }
-
       if (!content.includes("[[") && !relativePath.includes("index.md") && !relativePath.includes("log.md")) {
         issues.push(`ORPHAN PAGE: ${relativePath}`);
-      }
-
-      if (content.startsWith("---") && !content.includes("confidence:")) {
-        issues.push(`MISSING CONFIDENCE: ${relativePath}`);
       }
     } catch {
       // skip

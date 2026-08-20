@@ -77,20 +77,6 @@ let TOOLS: Tool[] = [
       },
       required: ["action"],
     },
-    outputSchema: {
-      type: "object",
-      properties: {
-        jobId: { type: "string" },
-        running: { type: "boolean" },
-        exitCode: { type: ["number", "null"] },
-        pid: { type: ["number", "null"] },
-        command: { type: "string" },
-        startedAt: { type: "string" },
-        stdoutTail: { type: "string" },
-        stderrTail: { type: "string" },
-      },
-      required: ["jobId", "running", "command", "startedAt", "stdoutTail", "stderrTail"],
-    },
   },
   {
     name: "web_search",
@@ -159,7 +145,7 @@ let TOOLS: Tool[] = [
     inputSchema: {
       type: "object",
       properties: {
-        action: { type: "string", enum: ["search", "add", "list", "delete", "collections", "ingest_sessions", "ingest_anythingllm"], description: "Which RAG action to perform" },
+        action: { type: "string", enum: ["search", "add", "list", "delete", "collections", "ingest_sessions", "ingest_anythingllm", "ingest_status"], description: "Which RAG action to perform" },
         collection: { type: "string", description: "Collection name (search/add/list/delete)" },
         query: { type: "string", description: "Semantic query (action=search)" },
         id: { type: "string", description: "Document ID (action=add/delete)" },
@@ -171,6 +157,7 @@ let TOOLS: Tool[] = [
         reindex: { type: "boolean", description: "Re-index from scratch (action=ingest_sessions)" },
         workspace: { type: "string", description: "AnythingLLM workspace slug (action=ingest_anythingllm, optional; default all)" },
         thread: { type: "string", description: "AnythingLLM thread slug (action=ingest_anythingllm, optional)" },
+        jobId: { type: "string", description: "Ingest job id returned by ingest_sessions/ingest_anythingllm (action=ingest_status, required)" },
       },
       required: ["action"],
     },
@@ -203,39 +190,6 @@ let TOOLS: Tool[] = [
         keepExchanges: { type: "number", description: "Recent user exchanges kept verbatim (action=session, default 2)" },
       },
       required: ["action"],
-    },
-    outputSchema: {
-      type: "object",
-      properties: {
-        memory: {
-          type: "object",
-          properties: {
-            path: { type: "string" },
-            lines: { type: ["number", "null"] },
-            threshold: { type: "number" },
-            compactionRecommended: { type: "boolean" },
-          },
-          required: ["path", "threshold", "compactionRecommended"],
-        },
-        archive: {
-          type: "object",
-          properties: {
-            path: { type: "string" },
-            exists: { type: "boolean" },
-            sizeKB: { type: ["number", "null"] },
-          },
-          required: ["path", "exists"],
-        },
-        compactedSessions: {
-          type: "object",
-          properties: {
-            path: { type: "string" },
-            count: { type: "number" },
-          },
-          required: ["path", "count"],
-        },
-      },
-      required: ["memory", "archive", "compactedSessions"],
     },
   },
   {
