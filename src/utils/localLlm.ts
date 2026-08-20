@@ -24,29 +24,86 @@ export async function chatCompletion(opts: {
   maxTokens?: number;
   temperature?: number;
   timeoutMs?: number;
+  disableThinking?: boolean;
 }): Promise<string> {
-  const { model, messages, maxTokens = 1024, temperature = 0.3, timeoutMs = 180_000 } = opts;
+  const {
+    model,
+    messages,
+    maxTokens = 2048,
+    temperature = 0.3,
+    timeoutMs = 180_000,
+    disableThinking = true,
+  } = opts;
+
+  const base: Record<string, unknown> = { model, messages, max_tokens: maxTokens, temperature };
+  const variants: Record<string, unknown>[] = [];
+  if (disableThinking) {
+    // Reasoning models (e.g. Qwen3) spend the whole budget on "thinking" and return
+    // empty content. Requesting the chat template without thinking avoids that.
+    variants.push({ ...base, chat_template_kwargs: { enable_thinking: false } });
+  }
+  variants.push(base);
+
+  const attempts: string[] = [];
+  for (const body of variants) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let res: Response;
+    try {
+      res = await fetch(llmUrl(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } catch (e) {
+      attempts.push(`network: ${e instanceof Error ? e.message : String(e)}`);
+      continue;
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      attempts.push(`HTTP ${res.status}: ${detail.slice(0, 120)}`);
+      continue;
+    }
+    const data: any = await res.json();
+    const msg = data?.choices?.[0]?.message;
+    const content = msg?.content;
+    if (typeof content === "string" && content.trim()) return content.trim();
+    attempts.push(
+      `empty content (finish=${data?.choices?.[0]?.finish_reason}, reasoning=${(msg?.reasoning_content || "").length})`
+    );
+  }
+
+  // Last resort: one attempt with a much larger budget, in case the reasoning
+  // consumed the previous token allowance before the final answer.
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(llmUrl(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature }),
+      body: JSON.stringify({ ...base, max_tokens: 8192 }),
       signal: controller.signal,
     });
-    if (!res.ok) {
-      throw new Error(`LLM API error (${res.status}): ${await res.text()}`);
+    if (res.ok) {
+      const data: any = await res.json();
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content === "string" && content.trim()) return content.trim();
+      attempts.push(`empty content (finish=${data?.choices?.[0]?.finish_reason})`);
+    } else {
+      const detail = await res.text().catch(() => "");
+      attempts.push(`HTTP ${res.status}: ${detail.slice(0, 120)}`);
     }
-    const data: any = await res.json();
-    const content = data?.choices?.[0]?.message?.content;
-    if (typeof content !== "string" || !content.trim()) {
-      throw new Error("LLM returned empty content");
-    }
-    return content.trim();
   } finally {
     clearTimeout(timer);
   }
+
+  throw new Error(
+    `LLM returned empty content (model=${model}). Attempts: ${attempts.join(" | ")}`
+  );
 }
 
 export async function summarizeTranscript(opts: {
@@ -55,7 +112,7 @@ export async function summarizeTranscript(opts: {
   chunkTokens?: number;
   maxOutputTokens?: number;
 }): Promise<string> {
-  const { transcript, model, chunkTokens = 4000, maxOutputTokens = 1024 } = opts;
+  const { transcript, model, chunkTokens = 4000, maxOutputTokens = 2048 } = opts;
   const budgetChars = Math.max(1, chunkTokens) * 4;
 
   const chunks: string[] = [];

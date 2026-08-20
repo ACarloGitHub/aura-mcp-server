@@ -78,31 +78,35 @@ export async function parseConversation(filepath: string): Promise<ParsedConvers
       }
       contentText = parts.join(" ");
     } else if (role === "assistant") {
+      // Keep only the assistant's final answer block. Reasoning models (e.g. Qwen3)
+      // store their chain-of-thought as plain "text" segments, so we walk the steps
+      // backwards and take the last content block that contains text and no tool
+      // calls; anything before it (reasoning narration, tool requests/results,
+      // toolStatus/debugInfoBlock steps) is excluded.
       const steps: any[] = Array.isArray(version?.steps) ? version.steps : [];
-      const stepTexts: string[] = [];
-      steps.forEach((step, idx) => {
-        const sc = step?.content;
-        if (Array.isArray(sc)) {
-          for (const seg of sc) {
-            if (seg && typeof seg === "object") {
-              const text = asString(seg.text);
-              const segType = asString(seg.type);
-              const isStructural = !!seg.isStructural;
-              if (text && segType !== "thinking" && !isStructural) {
-                if (idx === 0 && text.startsWith("Here") && text.slice(0, 50).toLowerCase().includes("thinking process")) {
-                  continue;
-                }
-                stepTexts.push(text);
-              }
-            } else if (typeof seg === "string" && seg.trim()) {
-              stepTexts.push(seg);
-            }
-          }
-        } else if (typeof sc === "string" && sc.trim()) {
-          stepTexts.push(sc);
+      let answerText = "";
+      for (let i = steps.length - 1; i >= 0; i--) {
+        const step = steps[i];
+        if (!step || step.type !== "contentBlock") continue;
+        let texts: string[] = [];
+        if (typeof step.content === "string") {
+          if (step.content.trim()) texts = [step.content];
+        } else if (Array.isArray(step.content)) {
+          const segs = step.content.filter((s: any) => s && typeof s === "object");
+          const hasTool = segs.some(
+            (s: any) => s.type === "toolCallRequest" || s.type === "toolCallResult"
+          );
+          if (hasTool) break;
+          texts = segs
+            .filter((s: any) => s.type === "text" && !s.isStructural && asString(s.text))
+            .map((s: any) => asString(s.text));
         }
-      });
-      contentText = stepTexts.join("\n");
+        if (texts.length) {
+          answerText = texts.join(" ");
+          break;
+        }
+      }
+      contentText = answerText;
     }
 
     if (contentText.trim()) {

@@ -178,7 +178,7 @@ let TOOLS: Tool[] = [
   },
   {
     name: "compact",
-    description: "Bound long-term notes and sessions. memory/status/list manage MEMORY.md and compacted-sessions/. session is LM Studio only: compacts an LM Studio chat into a new chat file (summary + first message + last exchanges, summary only above 50% of context).",
+    description: "Bound long-term notes and sessions. memory/status/list manage MEMORY.md and compacted-sessions/. session is LM Studio only: compacts an LM Studio chat into a new chat file. It reads the chat's .conversation.json (messages[].versions[].steps[].content[]), extracting the user messages and each assistant's final answer block (excluding the model's reasoning narration, tool-call internals and debug blocks), summarizes them with the local model, and writes a NEW chat file (original untouched).",
     inputSchema: {
       type: "object",
       properties: {
