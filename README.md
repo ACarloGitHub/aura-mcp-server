@@ -35,7 +35,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that gives yo
 | 🔎 **RAG** | Semantic search via a native TypeScript engine (sqlite-vec) over sessions and auto-extracted entities. **No Python.** |
 | 💬 **AnythingLLM** | Export chat sessions directly from AnythingLLM API. |
 | 🔔 **Notifications** | Desktop notifications + beep when the agent completes tasks. |
-| 🛠️ **12 Built-in Tools** | `file`, `exec`, `exec_job`, `web_search`, `wiki`, `wiki_ingest`, `rag`, `planner`, `compact`, `anythingllm`, `notify`. |
+| 🛠️ **12 Built-in Tools** | `file`, `exec`, `exec_job`, `web_search`, `wiki`, `wiki_ingest`, `rag`, `planner`, `compact`, `anythingllm_chat_exporter`, `notify`. |
 
 ## Requirements
 
@@ -147,7 +147,7 @@ Both hosts use the same `mcpServers` shape and the same command —
 
 ### AnythingLLM API (optional)
 
-To use the `anythingllm` tool (chat export), copy the template:
+To use the `anythingllm_chat_exporter` tool (chat export from AnythingLLM), copy the template:
 
 ```bash
 cp api-key.example.json api-key.json
@@ -178,11 +178,11 @@ writes `SOUL.md`, `MEMORY.md`, `USER.md`, `Wiki/`, `plans/` and
 | `exec_job` | Manage a background exec job (poll, kill, list, clean). |
 | `web_search` | Web search via DuckDuckGo. |
 | `wiki` | Manage the local wiki (search, read, write, list). |
-| `wiki_ingest` | Curate a structured Karpathy-style wiki: ingest raw files, query the index, lint integrity, update index and log. |
-| `rag` | Semantic search using a native sqlite-vec engine + `nomic-embed-text-v2-moe`. |
+| `wiki_ingest` | Curate a structured Karpathy-style wiki: ingest raw files, fix the wiki into the RAG (`ingest_wiki`), query the index, lint integrity, update index and log. |
+| `rag` | Semantic search using a native sqlite-vec engine + `nomic-embed-text-v2-moe`. Chat capture: `ingest_sessions` (LM Studio), `ingest_anythingllm` (AnythingLLM). |
 | `planner` | Create and execute phased plans with blocking questions. |
-| `compact` | Memory compaction + session archiving. |
-| `anythingllm` | Export chat sessions from AnythingLLM API. |
+| `compact` | Memory compaction + session archiving. `session` action is LM Studio only (chat → new compacted chat file). |
+| `anythingllm_chat_exporter` | AnythingLLM only: export chat sessions from AnythingLLM API. |
 | `notify` | Desktop notification + beep when tasks complete. |
 | `permissions` | Grant, revoke, or list path permissions for file access outside the workspace. |
 

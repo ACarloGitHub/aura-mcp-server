@@ -39,6 +39,7 @@ The advanced / structured side. Companion to `wiki` for organising the body of k
 | Action | Args | Purpose |
 |---|---|---|
 | `ingest` | `source` (path under `Wiki/raw/`) | Loads a raw file and emits the role-reminder instructions for the model to write summaries, concepts, entities and links. |
+| `ingest_wiki` | — | **Fixes the curated wiki into the RAG.** Scans `Wiki/` for `.md` pages (excluding `raw/`, `test/`, `ritest/`, `index.md`, `log.md`) and upserts each into the RAG collection `wiki` (id = page path, metadata `{type, title, source}`). Re-running updates in place (upsert by id), so the RAG always mirrors the current wiki. Does **not** touch `wiki/index.md`. |
 | `query` | `query_text` | Surfaces the index, prompting the model to drill down via `wiki(search|read)`. |
 | `lint` | — | Integrity check: missing frontmatter, orphan pages, missing `confidence:`. |
 | `update_index` | — | Rebuilds `wiki/index.md` from the on-disk content. |
@@ -49,8 +50,9 @@ The advanced / structured side. Companion to `wiki` for organising the body of k
 1. Drop a source file in `Wiki/raw/`.
 2. Call `wiki_ingest(action=ingest, source="...")`. The model receives the file content with instructions to write `summaries/`, `concepts/`, `entities/` pages and update the index.
 3. After the model writes pages, call `wiki_ingest(action=update_index)` and `wiki_ingest(action=update_log, source="ingested <name>")`.
-4. Periodically run `wiki_ingest(action=lint)` to surface missing frontmatter or orphan pages.
-5. Use `wiki(search|read)` for fast keyword lookup of the curated knowledge.
+4. Run `wiki_ingest(action=ingest_wiki)` to fix the curated pages into the RAG `wiki` collection, then use `rag(action=search, collection="wiki")` for semantic recall.
+5. Periodically run `wiki_ingest(action=lint)` to surface missing frontmatter or orphan pages.
+6. Use `wiki(search|read)` for fast keyword lookup of the curated knowledge.
 
 ## See also
 

@@ -61,7 +61,15 @@ The bundled installer downloads the `nomic-embed-text-v2-moe.Q8_0.gguf` model (~
 
 | Variable | Default | Description |
 |---|---|---|
-| `LM_STUDIO_CONVERSATIONS_DIR` | `~/.lmstudio/conversations` | LM Studio sessions directory. `rag(ingest_sessions)` reads from here. |
+| `LM_STUDIO_CONVERSATIONS_DIR` | auto-detect | LM Studio sessions directory. `rag(ingest_sessions)` and `compact(action=session)` read from here. Detection order: this env var, then `~/.cache/lm-studio/conversations` (LM Studio 0.4+), then `~/.lmstudio/conversations`. |
+
+## Local LLM (session summarization)
+
+| Variable | Default | Description |
+|---|---|---|
+| `AURA_LLM_URL` | `http://localhost:1234/v1/chat/completions` | OpenAI-compatible chat endpoint used by `compact(action=session)` to generate the summary. |
+| `AURA_LLM_MODEL` | chat's `lastUsedModel` | Model id for the summarization call. |
+| `AURA_COMPACT_CONTEXT_LENGTH` | from chat file, else `8192` | Context window (tokens) used for the "50% over budget → summary only" check. |
 
 ## Setting on Linux/macOS
 

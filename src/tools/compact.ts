@@ -317,20 +317,45 @@ async function compactSession(args: CompactArgs): Promise<any> {
   raw.messages.forEach((m: any, i: number) => {
     if (rawRole(m) === "user") userIdx.push(i);
   });
-  const keepExchanges = Math.max(1, Math.min(args.keepExchanges ?? 2, 10));
-  const firstUser = userIdx[0];
-  const startTail = userIdx.length > 0 ? userIdx[Math.max(0, userIdx.length - keepExchanges)] : 0;
+  const requestedExchanges = Math.max(1, Math.min(args.keepExchanges ?? 2, 10));
+  const pickKept = (keepExchanges: number): any[] => {
+    const total = raw.messages?.length ?? 0;
+    const keptIndices = new Set<number>();
+    if (userIdx.length > 0) {
+      keptIndices.add(userIdx[0]);
+      for (let i = userIdx[0] + 1; i < total; i++) {
+        if (rawRole(raw.messages[i]) === "assistant") {
+          keptIndices.add(i);
+          break;
+        }
+      }
+    }
+    const startTail = userIdx.length > 0 ? userIdx[Math.max(0, userIdx.length - keepExchanges)] : 0;
+    for (let i = startTail; i < total; i++) keptIndices.add(i);
+    return (raw.messages as any[]).filter((_, i) => keptIndices.has(i));
+  };
+  const estimateWith = (msgs: any[]): number =>
+    estimateTokens(newSystemPrompt) + estimateTokens(msgs.map(rawMessageText).join("\n"));
 
-  const keptIndices = new Set<number>();
-  if (firstUser !== undefined) keptIndices.add(firstUser);
-  for (let i = startTail; i < (raw.messages?.length ?? 0); i++) keptIndices.add(i);
+  let effectiveExchanges = requestedExchanges;
+  let keptMessages = pickKept(effectiveExchanges);
+  let estimated = estimateWith(keptMessages);
+  let tailReduced = false;
+  let summaryOnly = false;
 
-  const keptMessages = (raw.messages as any[]).filter((_, i) => keptIndices.has(i));
-  const keptText = keptMessages.map(rawMessageText).join("\n");
-  const estimated = estimateTokens(newSystemPrompt) + estimateTokens(keptText);
+  if (estimated > halfContext && effectiveExchanges > 1) {
+    effectiveExchanges = 1;
+    tailReduced = true;
+    keptMessages = pickKept(effectiveExchanges);
+    estimated = estimateWith(keptMessages);
+  }
+  if (estimated > halfContext) {
+    summaryOnly = true;
+    keptMessages = [];
+    estimated = estimateTokens(newSystemPrompt);
+  }
 
-  const summaryOnly = estimated > halfContext;
-  const finalMessages = summaryOnly ? [] : keptMessages;
+  const finalMessages = keptMessages;
 
   const newTimestamp = Date.now();
   const newRaw = JSON.parse(JSON.stringify(raw));
@@ -348,13 +373,16 @@ async function compactSession(args: CompactArgs): Promise<any> {
   const safeName = (conv.name || "session").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "_") || "session";
   const dateTag = new Date().toISOString().split("T")[0];
   const seedPath = join(COMPACTED_DIR(), `${safeName}-${dateTag}.seed.md`);
+  const mode = summaryOnly
+    ? "solo riassunto (sopra il 50% del contesto anche con 1 scambio)"
+    : `riassunto + primo scambio + ultime ${effectiveExchanges} exchange${effectiveExchanges > 1 ? "s" : ""}${tailReduced ? " (coda ridotta per rientrare nel budget)" : ""}`;
   const seedContent = [
     `# Seed — ${conv.name}`,
     ``,
     `- Compattata da: ${basename(filepath)}`,
     `- Nuova chat: ${basename(newFile)}`,
     `- Data: ${dateTag}`,
-    `- Modalità: ${summaryOnly ? "solo riassunto (sopra il 50% del contesto)" : "riassunto + primi/ultimi messaggi"}`,
+    `- Modalità: ${mode}`,
     ``,
     `## Riepilogo`,
     ``,
@@ -372,7 +400,7 @@ async function compactSession(args: CompactArgs): Promise<any> {
           ``,
           `Chat: ${conv.name}`,
           `Context: ${contextLength} tokens (half: ${halfContext})`,
-          `Estimated compacted: ~${estimated} tokens${summaryOnly ? " → over budget, kept summary only" : ""}`,
+          `Estimated compacted: ~${estimated} tokens${tailReduced ? " (tail reduced to 1 exchange)" : ""}${summaryOnly ? " → over budget even with 1 exchange, kept summary only" : ""}`,
           `New chat file: ${newFile}`,
           `Seed file: ${seedPath}`,
           ``,

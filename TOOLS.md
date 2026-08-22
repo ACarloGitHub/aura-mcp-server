@@ -67,12 +67,13 @@ Manage the local `Wiki/` directory under `AGENT_WORKSPACE`.
 ## wiki_ingest
 
 ```json
-{ "action": "ingest|query|lint|update_index|update_log", "source": "...", "query_text": "..." }
+{ "action": "ingest|ingest_wiki|query|lint|update_index|update_log", "source": "...", "query_text": "..." }
 ```
 
 Curate the structured knowledge graph (Karpathy-style).
 
 - `ingest`: load a raw file (path in `source`) and return its content with role-reminder instructions.
+- `ingest_wiki`: **fix the curated wiki into the RAG** — scans `Wiki/` for `.md` pages (excluding `raw/`, `test/`, `ritest/`, `index.md`, `log.md`) and upserts each into the RAG `wiki` collection (id = page path). Re-running updates in place.
 - `query`: surface the wiki index (used as input to `wiki(action=search|read)`).
 - `lint`: integrity check (frontmatter, orphan pages, confidence).
 - `update_index`: rebuild `wiki/index.md` from the on-disk markdown.
@@ -81,7 +82,7 @@ Curate the structured knowledge graph (Karpathy-style).
 ## rag
 
 ```json
-{ "action": "search|add|list|delete|collections|ingest_sessions", "collection": "...", "query": "...", "id": "...", "text": "...", "metadata": "...", "limit": 5, "filter": "..." }
+{ "action": "search|add|list|delete|collections|ingest_sessions|ingest_anythingllm", "collection": "...", "query": "...", "id": "...", "text": "...", "metadata": "...", "limit": 5, "filter": "..." }
 ```
 
 Semantic search via a native `sqlite-vec` index, with embeddings computed by a local CPU-only `llama.cpp` (`llama-server --embedding`) running `nomic-embed-text-v2-moe`. **No Python required.** The Node MCP server starts/stops the embedding backend automatically. The bundled installer downloads the GGUF model on first launch; from source, set `EMBED_GGUF` to the model path.
@@ -90,7 +91,8 @@ Semantic search via a native `sqlite-vec` index, with embeddings computed by a l
 - `add`/`delete`: idempotent on document ID; long documents are chunked automatically.
 - `list`: lists documents in a collection.
 - `collections`: lists all collections.
-- `ingest_sessions`: indexes LM Studio sessions (parsed natively); re-index with `reindex: true`.
+- `ingest_sessions`: **LM Studio only.** Indexes LM Studio conversations from disk (exported as `.md` in `Sessions/` and indexed into the `sessions` collection). Re-index with `reindex: true`.
+- `ingest_anythingllm`: **AnythingLLM only.** Reads chats via the AnythingLLM API (`workspace`/`thread` optional), exports `.md` to `AnythingLLMSessions/` and indexes them into the `sessions` collection.
 
 ## planner
 
@@ -106,26 +108,29 @@ Phased plans stored under `plans/`. Tasks are GitHub-style checkbox lines (`- [ 
 ## compact
 
 ```json
-{ "action": "memory|status|list", "threshold": 300 }
+{ "action": "memory|status|list|session", "threshold": 300, "title": "...", "contextLength": 8192, "model": "...", "keepExchanges": 2 }
 ```
 
 - `memory`: archives the body of `MEMORY.md` into `memory-archive.md` when above the line threshold, then rewrites `MEMORY.md` with a pointer.
 - `status`: returns `{memory, archive, compactedSessions}` as `structuredContent`.
 - `list`: lists already-compacted sessions.
+- `session` (**LM Studio only**): given the chat `title`, writes a NEW chat file with `systemPrompt` = original + summary of the whole conversation and `messages` = first user message + last `keepExchanges` exchanges verbatim. If the estimated size exceeds 50% of the context window (from the chat file / `contextLength` / `AURA_COMPACT_CONTEXT_LENGTH`), it keeps the summary only. The original is never modified. Summary model: `AURA_LLM_MODEL` or the chat's `lastUsedModel`, via `AURA_LLM_URL`.
 
-## anythingllm
+## anythingllm_chat_exporter
 
 ```json
 { "action": "list|export|export-all", "workspace": "...", "thread": "...", "apiKey": "..." }
 ```
 
-Exports chats from a running AnythingLLM instance (`http://localhost:3001` by default; override with `ANYTHINGLLM_BASE_URL`).
+**AnythingLLM only.** Exports chats from a running AnythingLLM instance (`http://localhost:3001` by default; override with `ANYTHINGLLM_BASE_URL`).
 
 - `list`: lists all workspaces and threads.
 - `export`: exports one workspace (optionally one thread) to a markdown file in `AnythingLLMSessions/`.
 - `export-all`: bulk exports all workspaces.
 
 Requires either the `apiKey` argument, `ANYTHINGLLM_API_KEY` env var, or `api-key.json` in the server directory.
+
+To store AnythingLLM chats into the RAG, use `rag(action=ingest_anythingllm)` (it calls this exporter internally).
 
 ## notify
 

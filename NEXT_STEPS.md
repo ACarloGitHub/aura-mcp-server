@@ -1,74 +1,48 @@
 # Next Steps — aura-mcp-server
 
-Ultimo aggiornamento: 2026-07-16
+Ultimo aggiornamento: 2026-08-22
 
-## Cosa e' stato fatto oggi (2026-07-16)
+## Obiettivo corrente: release v3.6.3 (compattazione più intelligente)
 
-1. **Root cause trovata**: `stdin(Stdio::null())` in `start_mcp_child`
-   uccideva il server MCP immediatamente (EOF su stdin →
-   `process.exit(0)`). Fixato con `stdin(Stdio::piped())`.
+### Modifiche implementate (v3.6.3)
 
-2. **Dev mode funzionante**: `npm run tauri dev` ora funziona:
-   - Rimosso `devUrl` da `tauri.conf.json` (frontend statico, niente dev server)
-   - `find_index_js` e `find_llama_server` fanno walk-up dall'eseguibile
-     per trovare `dist/index.js` e `vendor/llama.cpp/` nella root del repo
-   - stdout/stderr del server MCP visibili nel terminale in debug build
-     (`cfg!(debug_assertions)` → `Stdio::inherit()`)
+1. **Primo scambio completo nel seed** — `compact(session)` ora include nel nuovo
+   chat file anche la risposta dell'assistente al primo messaggio utente
+   (`src/tools/compact.ts`, `pickKept`).
+2. **Riduzione progressiva della coda** — se la stima supera il 50% del contesto:
+   prima si riduce da 2 a 1 exchange e si riverifica; solo restando over budget si
+   cade sul fallback "solo riassunto" (prima si scartavano tutti i messaggi subito).
+3. **Stima ricalcolata a ogni passo** — il tool response e la riga `Modalità` del
+   seed `.md` riflettono ciò che è stato davvero mantenuto.
+4. **Documentazione** — `documentation/compaction.md` allineata al nuovo comportamento.
 
-3. **Verificato**: l'utente ha confermato che la dev version funziona
-   (Start/Stop/Status OK). L'unica cosa che non funziona e' `get_version`.
+### Da fare
 
-4. **Documentazione aggiornata**: RELEASE_PROCESS.md con Step 0 (dev
-   testing) e lessons #12-#15.
+- [x] Bump a 3.6.3 (package.json, src-tauri/Cargo.toml, src-tauri/tauri.conf.json).
+- [x] Commit, push main, tag v3.6.3.
+- [ ] CI verde (3 job + release), source archive corretto, pubblica draft come latest.
+- [ ] Verifiche con l'agente in LM Studio (dopo installazione):
+  - `compact(action=session)` su una chat lunga → il seed contiene primo scambio
+    completo + ultime 2 exchanges;
+  - stessa chat con `contextLength` basso forzato (`AURA_COMPACT_CONTEXT_LENGTH`) →
+    coda ridotta a 1 exchange; con budget ancora minore → solo riassunto;
+  - il file originale non viene modificato.
 
-## Cosa NON e' ancora stato fatto
+## Contesto precedente
 
-### A. Fix `plugin:app|get_version` (errore in console)
-
-Il frontend (`src-tauri/dist/app.js:288`) chiama:
-```js
-invoke("plugin:app|get_version")
-```
-ma il plugin `tauri-plugin-app` non e' installato.
-
-**Da fare**:
-1. `cargo add tauri-plugin-app` in `src-tauri/`
-2. Aggiungere `.plugin(tauri_plugin_app::init())` al Builder in `lib.rs:739`
-3. Verificare che la versione appaia correttamente nella UI
-
-In alternativa, se non serve il plugin, sostituire la chiamata con un
-comando custom esposto via `#[tauri::command]`.
-
-### B. Rilasciare v3.4.1 (o rifare v3.4.0)
-
-L'attuale v3.4.0 draft (id `355162075`) su GitHub e' stato buildata con
-il codice VECCHIO (stdin null, devUrl, senza dev-mode fix). Va rifatto.
-
-**Prima di rilasciare**:
-1. Fixare il punto A (get_version)
-2. `npm run tauri dev` → verificare Start/Stop/Status/version
-3. Bump versione se necessario (3.4.1 per indicare il fix)
-4. Commit, push, tag, CI
-5. Pubblicare la draft come latest
-6. Installare e testare la versione installata
-
-### C. Pulizia
-
-- v3.4.0 draft `355162075` su GitHub: cancellare o sovrascrivere
-- File temporanei in `C:\Users\carlo\AppData\Local\Temp\opencode\` (MSI
-  estratti, log di test)
-
-## Stato file modificati (non committati)
-
-- `src-tauri/src/lib.rs` — find_index_js (walk-up), find_llama_server
-  (walk-up), start_mcp_child (stdin piped, stdout/stderr inherit in debug)
-- `src-tauri/tauri.conf.json` — rimosso devUrl
-- `documentation/RELEASE_PROCESS.md` — Step 0 + lessons #12-#15
-- `NEXT_STEPS.md` — questo file
+- v3.6.2 (rilasciata): compact robusto con reasoning model, estrazione answer-only.
+- v3.6.1 (rilasciata): niente console in --serve, no outputSchema su compact/exec_job,
+  batch 2048, ingest in background.
+- v3.6.0 (rilasciata): compact(session), RAG per client, wiki→RAG, windowsHide.
 
 ## Lezioni chiave
 
-- **Mai** usare `Stdio::null()` per stdin di un processo che legge stdin
-- **Sempre** testare con `npm run tauri dev` prima di rilasciare
-- I path `../` nei resources Tauri v2 diventano `_up_/` nel bundle
-- `devUrl` e' opzionale: serve solo con framework HMR, non con frontend statico
+- Mai riscrivere un `.conversation.json` esistente (LM Studio lo cache): scrivere solo file nuovi.
+- I file chat LM Studio si chiamano `<createdAt>.conversation.json`; il contesto caricato è in
+  `lastUsedModel.instanceLoadTimeConfig` (oggetti `{key, value}`).
+- Tool MCP con `outputSchema`: OGNI azione deve restituire `structuredContent`, altrimenti
+  un client strict (LM Studio) rifiuta con `-32600`. Preferire niente `outputSchema` sui
+  multi-azione.
+- llama-server: default `--batch-size` 512 → i chunk oltre quel limite falliscono con HTTP 500.
+- Le operazioni lunghe (embedding CPU) superano il timeout del client MCP: eseguirle in
+  sottofondo e farle monitorare con polling.

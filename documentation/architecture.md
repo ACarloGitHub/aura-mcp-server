@@ -30,11 +30,11 @@ auramcp-server (Node.js, ESM)
 | 3 | `exec_job` | `poll` \| `kill` \| `list` \| `clean` | yes (poll) |
 | 4 | `web_search` | — | yes |
 | 5 | `wiki` | `search` \| `read` \| `write` \| `list` | yes (list) |
-| 6 | `wiki_ingest` | `ingest` \| `query` \| `lint` \| `update_index` \| `update_log` | no |
-| 7 | `rag` | `search` \| `add` \| `list` \| `delete` \| `collections` \| `ingest_sessions` | yes (search) |
+| 6 | `wiki_ingest` | `ingest` \| `ingest_wiki` \| `query` \| `lint` \| `update_index` \| `update_log` | no |
+| 7 | `rag` | `search` \| `add` \| `list` \| `delete` \| `collections` \| `ingest_sessions` \| `ingest_anythingllm` | yes (search) |
 | 8 | `planner` | `create` \| `read` \| `list` \| `update` \| `delete` \| `next` \| `status` | yes (status) |
-| 9 | `compact` | `memory` \| `status` \| `list` | yes (status) |
-| 10 | `anythingllm` | `list` \| `export` \| `export-all` | no |
+| 9 | `compact` | `memory` \| `status` \| `list` \| `session` | yes (status) |
+| 10 | `anythingllm_chat_exporter` | `list` \| `export` \| `export-all` | no |
 | 11 | `notify` | — | no |
 | 12 | `permissions` | `grant` \| `revoke` \| `list` \| `clear_session` | no |
 
@@ -74,16 +74,22 @@ src/
     ├── exec-safety.ts      deny-list checkCommandSafety (new)
     ├── webSearch.ts        DuckDuckGo Lite POST (existing, instruction-prefixed)
     ├── wiki.ts             search|read|write|list (existing, instruction-prefixed, structuredContent for list)
-    ├── wiki_ingest.ts      ingest|query|lint|update_index|update_log
-    ├── rag.ts              search|add|list|delete|collections|ingest_sessions
+    ├── wiki_ingest.ts      ingest|ingest_wiki|query|lint|update_index|update_log
+    ├── rag.ts              search|add|list|delete|collections|ingest_sessions|ingest_anythingllm
     ├── planner.ts          create|read|list|update|delete|next|status
-    ├── compact.ts          memory|status|list (structuredContent for status)
-    ├── anythingllm.ts      list|export|export-all
+    ├── compact.ts          memory|status|list|session (structuredContent for status)
+    ├── anythingllm.ts      anythingllm_chat_exporter: list|export|export-all + ingest for RAG
     ├── notify.ts           desktop notification
     ├── permissions.ts      grant|revoke|list|clear_session (new)
     ├── read.ts / write.ts / edit.ts / list_dir.ts  thin targets for file()
     └── *.test.ts           node-runnable smoke tests
 ```
+
+Chat capture is client-specific and documented in the server `instructions` (set on the
+`Server` options) so the agent knows the cross-tool priorities: `compact(session)` and
+`rag(ingest_sessions)` are **LM Studio only** (read `.conversation.json` from disk);
+`anythingllm_chat_exporter` and `rag(ingest_anythingllm)` are **AnythingLLM only**
+(read chats via the AnythingLLM API).
 
 ## Permissions + categories
 
